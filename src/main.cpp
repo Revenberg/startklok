@@ -35,11 +35,16 @@ File uploadFile;
 
 // ================= HORN =================
 void horn(int ms) {
-  Serial.printf("[HORN] Activating horn for %d ms\n", ms);
+  Serial.println("\n========== HORN ACTIVATED ==========");
+  Serial.printf("[HORN] Duration: %d ms\n", ms);
+  Serial.printf("[HORN] Pin %d: Setting LOW (active)\n", HORN);
   digitalWrite(HORN, LOW);
+  Serial.printf("[HORN] Waiting %d ms...\n", ms);
   delay(ms);
+  Serial.printf("[HORN] Pin %d: Setting HIGH (inactive)\n", HORN);
   digitalWrite(HORN, HIGH);
   Serial.println("[HORN] Horn deactivated");
+  Serial.println("===================================\n");
 }
 
 // ================= CONTROL WRAPPERS =================
@@ -222,7 +227,10 @@ void setup() {
   
   // Set WebSocket message handler
   webUI.setMessageHandler([](String message) {
-    Serial.printf("[WS] Processing message: %s\n", message.c_str());
+    // Trim whitespace from message
+    message.trim();
+    
+    Serial.printf("[WS] Processing message: '%s' (length: %d)\n", message.c_str(), message.length());
     
     if (message == "start") {
       Serial.println("[WS] Starting race sequence");
@@ -233,11 +241,11 @@ void setup() {
       cancelRace();
     }
     else if (message == "horn") {
-      Serial.println("[WS] Sounding horn");
+      Serial.println("[WS] ✓ Horn command received!");
       horn(2000);  // 2 seconden hoorn
     }
     else {
-      Serial.printf("[WS] Unknown command: %s\n", message.c_str());
+      Serial.printf("[WS] Unknown command: '%s'\n", message.c_str());
     }
   });
   
