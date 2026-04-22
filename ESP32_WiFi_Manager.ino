@@ -9,6 +9,7 @@
 #include "RaceController.h"
 #include "WebUI.h"
 #include "lcd.h"
+#include "version.h"
 
 // ================= CONTROLLER INSTANCES =================
 RaceController raceController;
@@ -64,8 +65,14 @@ void handleStatus() {
   json += "\"running\":" + String(raceController.isRunning());
   json += ",\"sequence\":" + String(raceController.isSequence());
   json += ",\"remaining\":" + String(raceController.getRemaining());
+  json += ",\"version\":\"" + String(VERSION_STRING) + "\"";
   json += "}";
   server.send(200, "application/json", json);
+}
+
+// ================= VERSION =================
+void handleVersion() {
+  server.send(200, "text/plain", VERSION_STRING);
 }
 
 // ================= RELAY =================
@@ -150,6 +157,8 @@ void setup() {
   server.on("/", handleRoot);
 
   server.on("/status", handleStatus);
+  
+  server.on("/version", handleVersion);
 
   server.on("/relay", handleRelay);
 

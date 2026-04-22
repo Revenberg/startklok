@@ -1,0 +1,19 @@
+# Build directories
+build/
+.pio/
+.vscode/
+
+# Arduino build artifacts
+*.bin
+*.elf
+*.hex
+*.map
+
+# Temporary files
+*.tmp
+*.bak
+*~
+
+# OS files
+.DS_Store
+Thumbs.db

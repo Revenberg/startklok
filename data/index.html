@@ -93,6 +93,8 @@ button {
 
 <button id="setup" onclick="goSetup()">SETUP</button>
 
+<div style="position:fixed; bottom:10px; right:15px; font-size:12px; color:#555;" id="version">v0.0.0</div>
+
 <script>
 
 function startRace() {
@@ -131,6 +133,11 @@ function update() {
 
       if (data.scheduled && data.scheduled > 0) {
         document.getElementById("status").innerText += " | GESCHEDULED";
+      }
+      
+      // Update version number
+      if (data.version) {
+        document.getElementById("version").innerText = data.version;
       }
 
     })
