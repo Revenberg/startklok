@@ -37,6 +37,14 @@ body {
   color: #00ff88;
   font-weight: bold;
   font-variant-numeric: tabular-nums;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+#rtcIcon {
+  font-size: 16px;
+  opacity: 0.7;
 }
 
 #connection {
@@ -379,7 +387,10 @@ button:disabled {
 <body>
 
 <div id="topbar">
-  <div id="clock">--:--:--</div>
+  <div id="clock">
+    <span id="rtcIcon" title="RTC Status">⏱️</span>
+    <span id="clockTime">--:--:--</span>
+  </div>
   <div id="connection" class="disconnected">●  CONNECTING</div>
 </div>
 
@@ -470,6 +481,18 @@ function connectWebSocket() {
 // ================= DISPLAY UPDATE =================
 function updateDisplay(data) {
   console.log("📊 Data received:", data);
+  
+  // Update RTC time
+  if (data.rtcFound && data.rtcTime) {
+    rtcAvailable = true;
+    const rtc = data.rtcTime;
+    // Create Date object from RTC time
+    const rtcDate = new Date(rtc.year, rtc.month - 1, rtc.day, rtc.hour, rtc.minute, rtc.second);
+    rtcTimeOffset = rtcDate.getTime();
+    lastRtcUpdate = Date.now();
+  } else {
+    rtcAvailable = false;
+  }
   
   const remaining = data.remaining || 0;
   const elapsed = data.elapsed || 0;
@@ -583,12 +606,37 @@ function soundHorn() {
 }
 
 // ================= CLOCK =================
+let rtcTimeOffset = 0; // Offset tussen RTC en browser tijd
+let lastRtcUpdate = 0;
+let rtcAvailable = false;
+
 function updateClock() {
-  const now = new Date();
-  const h = String(now.getHours()).padStart(2, '0');
-  const m = String(now.getMinutes()).padStart(2, '0');
-  const s = String(now.getSeconds()).padStart(2, '0');
-  document.getElementById('clock').textContent = h + ':' + m + ':' + s;
+  if (rtcAvailable && lastRtcUpdate > 0) {
+    // Gebruik RTC tijd + elapsed tijd sinds laatste update
+    const elapsed = Date.now() - lastRtcUpdate;
+    const rtcTime = new Date(rtcTimeOffset + elapsed);
+    const h = String(rtcTime.getHours()).padStart(2, '0');
+    const m = String(rtcTime.getMinutes()).padStart(2, '0');
+    const s = String(rtcTime.getSeconds()).padStart(2, '0');
+    document.getElementById('clockTime').textContent = h + ':' + m + ':' + s;
+    
+    // Update RTC icon
+    document.getElementById('rtcIcon').textContent = '⏱️';
+    document.getElementById('rtcIcon').title = 'RTC I2C Actief';
+    document.getElementById('rtcIcon').style.opacity = '1';
+  } else {
+    // Fallback naar browser tijd
+    const now = new Date();
+    const h = String(now.getHours()).padStart(2, '0');
+    const m = String(now.getMinutes()).padStart(2, '0');
+    const s = String(now.getSeconds()).padStart(2, '0');
+    document.getElementById('clockTime').textContent = h + ':' + m + ':' + s;
+    
+    // Update RTC icon
+    document.getElementById('rtcIcon').textContent = '🕐';
+    document.getElementById('rtcIcon').title = 'Browser tijd (RTC niet beschikbaar)';
+    document.getElementById('rtcIcon').style.opacity = '0.5';
+  }
 }
 
 // ================= SCHEDULE =================

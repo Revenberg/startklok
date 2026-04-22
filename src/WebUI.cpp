@@ -32,13 +32,29 @@ void WebUI::setMessageHandler(WebSocketMessageHandler handler) {
   messageHandler = handler;
 }
 
-void WebUI::broadcastState(bool running, bool sequence, unsigned long remaining, unsigned long elapsed) {
+void WebUI::broadcastState(bool running, bool sequence, unsigned long remaining, unsigned long elapsed, RTC_DS3231* rtc) {
 
   String json = "{";
   json += "\"running\":" + String(running);
   json += ",\"sequence\":" + String(sequence);
   json += ",\"remaining\":" + String(remaining);
   json += ",\"elapsed\":" + String(elapsed);
+  
+  // RTC time and status
+  if (rtc != nullptr) {
+    DateTime now = rtc->now();
+    json += ",\"rtcFound\":true";
+    json += ",\"rtcTime\":{";
+    json += "\"hour\":" + String(now.hour());
+    json += ",\"minute\":" + String(now.minute());
+    json += ",\"second\":" + String(now.second());
+    json += ",\"day\":" + String(now.day());
+    json += ",\"month\":" + String(now.month());
+    json += ",\"year\":" + String(now.year());
+    json += "}";
+  } else {
+    json += ",\"rtcFound\":false";
+  }
   
   // Vlaggen op specifieke momenten tijdens sequence
   if (sequence && remaining > 0) {

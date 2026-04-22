@@ -5,6 +5,7 @@
 #include <LittleFS.h>
 #include <Update.h>
 #include <time.h>
+#include <Wire.h>
 
 #include "config.h"
 #include "relay.h"
@@ -170,10 +171,16 @@ void setup() {
   Serial.println("Initializing hardware...");
   relayInit();
   
+  // Initialize I2C for RTC (ESP32: SDA=GPIO21, SCL=GPIO22)
+  Serial.println("Initializing I2C bus...");
+  Wire.begin(21, 22);
+  Serial.println("[I2C] Bus initialized (SDA=21, SCL=22)");
+  
   // Initialize RTC
   Serial.println("Initializing DS3231 RTC...");
   if (!rtc.begin()) {
-    Serial.println("[ERROR] RTC not found!");
+    Serial.println("[ERROR] RTC not found on I2C bus!");
+    Serial.println("[ERROR] Check I2C connections: SDA=GPIO21, SCL=GPIO22");
   } else {
     Serial.println("[RTC] DS3231 initialized");
     
@@ -444,7 +451,8 @@ void loop() {
       raceController.isRunning(),
       raceController.isSequence(),
       raceController.getRemaining(),
-      raceController.getElapsed()
+      raceController.getElapsed(),
+      &rtc
     );
   }
 }
