@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<title>ESP Race Dashboard</title>
+
+<style>
+body {
+  font-family: Arial, sans-serif;
+  background: #0f0f0f;
+  color: white;
+  text-align: center;
+  margin: 0;
+  padding: 20px;
+}
+
+h1 {
+  font-size: 32px;
+  margin-bottom: 10px;
+}
+
+#clock {
+  font-size: 20px;
+  color: #aaa;
+}
+
+#timer {
+  font-size: 80px;
+  font-weight: bold;
+  margin: 30px 0;
+  color: #00ff88;
+}
+
+#status {
+  font-size: 18px;
+  color: #888;
+  margin-bottom: 20px;
+}
+
+button {
+  font-size: 24px;
+  padding: 15px 40px;
+  margin: 10px;
+  border: none;
+  border-radius: 10px;
+  cursor: pointer;
+}
+
+#start {
+  background: #28a745;
+  color: white;
+}
+
+#cancel {
+  background: #dc3545;
+  color: white;
+}
+
+#setup {
+  background: #444;
+  color: white;
+  font-size: 16px;
+  padding: 10px 20px;
+}
+
+.card {
+  background: #1a1a1a;
+  padding: 15px;
+  margin: 15px auto;
+  max-width: 400px;
+  border-radius: 12px;
+}
+</style>
+</head>
+
+<body>
+
+<h1>⛵ ESP Race Dashboard</h1>
+
+<div id="clock">--:--:--</div>
+
+<div class="card">
+  <div id="status">Laden...</div>
+  <div id="timer">--:--</div>
+</div>
+
+<button id="start" onclick="startRace()">START</button>
+<button id="cancel" onclick="cancelRace()">CANCEL</button>
+
+<br>
+
+<button id="setup" onclick="goSetup()">SETUP</button>
+
+<script>
+
+function startRace() {
+  fetch('/start');
+}
+
+function cancelRace() {
+  fetch('/cancel');
+}
+
+function goSetup() {
+  window.location.href = "/setup";
+}
+
+// format seconds → M:SS
+function formatTime(sec) {
+  let m = Math.floor(sec / 60);
+  let s = sec % 60;
+  return m + ":" + (s < 10 ? "0" : "") + s;
+}
+
+function update() {
+  fetch('/status')
+    .then(r => r.json())
+    .then(data => {
+
+      document.getElementById("clock").innerText = data.time;
+
+      if (data.running) {
+        document.getElementById("status").innerText = "RACE ACTIEF";
+        document.getElementById("timer").innerText = formatTime(data.remaining);
+      } else {
+        document.getElementById("status").innerText = "KLAAR VOOR START";
+        document.getElementById("timer").innerText = "READY";
+      }
+
+      if (data.scheduled && data.scheduled > 0) {
+        document.getElementById("status").innerText += " | GESCHEDULED";
+      }
+
+    })
+    .catch(() => {
+      document.getElementById("status").innerText = "VERBINDINGSFOUT";
+    });
+}
+
+setInterval(update, 500);
+update();
+
+</script>
+
+</body>
+</html>

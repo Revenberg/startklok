@@ -1,0 +1,43 @@
+void handleStatus() {
+  unsigned long t = millis() - raceStartTime;
+
+  String phase = "";
+  String toon = "";
+  String image1 = "";
+  String image2 = "";
+
+  if (t < 5000) {
+    phase = "5 minuten voor de start";
+    toon = "kort";
+    image1 = "P";
+    image2 = "";
+  }
+  else if (t < 10000) {
+    phase = "4 min";
+    toon = "kort";
+    image1 = "P";
+    image2 = "lelievlet";
+  }
+  else if (t < 15000) {
+    phase = "1 min - lang";
+    toon = "lang";
+    image1 = "";
+    image2 = "lelievlet";
+  }
+  else {
+    phase = "START";
+    toon = "kort";
+    image1 = "";
+    image2 = "";
+  }
+
+  String json = "{";
+  json += "\"phase\":\"" + phase + "\",";
+  json += "\"toon\":\"" + toon + "\",";
+  json += "\"image1\":\"" + image1 + "\",";
+  json += "\"image2\":\"" + image2 + "\",";
+  json += "\"running\":" + String(raceRunning);
+  json += "}";
+
+  server.send(200, "application/json", json);
+}

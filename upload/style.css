@@ -1,0 +1,59 @@
+#topbar {
+  position: fixed;
+  top: 10px;
+  right: 15px;
+  font-size: 18px;
+  color: #00ff88;
+  font-weight: bold;
+}
+
+body {
+  font-family: Arial;
+  background: #111;
+  color: #fff;
+  text-align: center;
+  margin: 0;
+  padding: 0;
+}
+
+.container {
+  padding: 20px;
+}
+
+h1 {
+  color: #00ff99;
+}
+
+.status {
+  margin: 10px;
+  font-size: 18px;
+}
+
+.buttons button {
+  padding: 15px 30px;
+  margin: 10px;
+  font-size: 18px;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+button {
+  background: #333;
+  color: white;
+}
+
+button:hover {
+  background: #00ff99;
+  color: black;
+}
+
+.timer {
+  font-size: 24px;
+  margin: 20px;
+}
+
+.relays button {
+  margin: 5px;
+  padding: 10px;
+}

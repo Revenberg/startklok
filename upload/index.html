@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Race</title>
+
+<style>
+body { background:#0f0f0f; color:white; text-align:center; font-family:Arial; }
+#status { font-size:28px; margin:10px; }
+#timer { font-size:80px; color:#00ff88; }
+button { padding:10px 20px; margin:5px; }
+.card { background:#1a1a1a; padding:10px; margin:10px; }
+</style>
+</head>
+
+<body>
+<div id="topbar">
+  <div id="clock">--:--:--</div>
+</div>
+<h1>⛵ Race Dashboard</h1>
+
+<div class="card">
+<div id="status">...</div>
+<div id="timer">--:--</div>
+</div>
+
+<button onclick="ws.send('start')">START</button>
+<button onclick="ws.send('cancel')">CANCEL</button>
+
+<br>
+<a href="/setup">SETUP</a>
+
+<script>
+
+let statusEl = document.getElementById("status");
+let timerEl = document.getElementById("timer");
+
+let ws = new WebSocket("ws://" + location.hostname + ":81");
+
+ws.onmessage = (e) => {
+
+  let d = JSON.parse(e.data);
+
+  statusEl.innerText = d.phase;
+
+  let sec = Math.max(0, Math.floor(d.remaining / 1000));
+
+  let m = Math.floor(sec / 60);
+  let s = sec % 60;
+
+  timerEl.innerText = m + ":" + (s < 10 ? "0" : "") + s;
+};
+
+</script>
+
+</body>
+</html>
