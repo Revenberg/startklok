@@ -136,20 +136,40 @@ void handleOTAUpload() {
 void setup() {
 
   Serial.begin(115200);
+  delay(100);
+  Serial.println("\n\n=== ESP32 Race Controller Starting ===");
 
   pinMode(HORN, OUTPUT);
   digitalWrite(HORN, HIGH);
 
+  Serial.println("Initializing LittleFS...");
   LittleFS.begin(true);
 
+  Serial.println("Initializing hardware...");
   relayInit();
   lcdInit();
   
+  Serial.println("Initializing race controller...");
   raceController.begin();
-  webUI.begin();
 
+  Serial.println("Loading config...");
   loadConfig();
+  
+  Serial.println("Starting WiFi...");
   startWiFi();
+  
+  // Print IP address
+  if (cfg.mode == "STA" && WiFi.status() == WL_CONNECTED) {
+    Serial.print("WiFi connected! IP: ");
+    Serial.println(WiFi.localIP());
+  } else {
+    Serial.print("AP Mode started. IP: ");
+    Serial.println(WiFi.softAPIP());
+  }
+  
+  Serial.println("Starting WebSocket server...");
+  webUI.begin();
+  
   registerConfigRoutes(server);
   
   lcdShowIdle(cfg.mode, cfg.ssid);
@@ -201,7 +221,17 @@ void setup() {
     }
   });
 
+  Serial.println("Starting web server on port 80...");
   server.begin();
+  
+  Serial.println("=== READY ===");
+  Serial.print("Dashboard: http://");
+  if (cfg.mode == "STA" && WiFi.status() == WL_CONNECTED) {
+    Serial.print(WiFi.localIP());
+  } else {
+    Serial.print(WiFi.softAPIP());
+  }
+  Serial.println("/");
 }
 
 // ================= LOOP =================
