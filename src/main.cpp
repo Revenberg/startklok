@@ -44,7 +44,9 @@ void horn(int ms) {
   delay(ms);
   Serial.printf("[HORN] Pin %d: Setting HIGH (inactive)\n", HORN);
   digitalWrite(HORN, HIGH);
+  relaySet(1, 0); // Relay 1 OFF
   Serial.println("[HORN] Horn deactivated");
+  Serial.println("[HORN] Relay 1 turned OFF");
   Serial.println("===================================\n");
 }
 
