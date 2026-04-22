@@ -68,7 +68,7 @@ void handleRoot() {
   if (LittleFS.exists("/index.html")) {
     File f = LittleFS.open("/index.html", "r");
     Serial.printf("[HTTP] File size: %d bytes\n", f.size());
-    server.streamFile(f, "text/html");
+    server.streamFile(f, "text/html; charset=utf-8");
     f.close();
     Serial.println("[HTTP] index.html sent successfully");
   } else {
