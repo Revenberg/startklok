@@ -68,7 +68,10 @@ void RaceController::stepSequence() {
   if (seqStep == 3 && t >= 300000) {
     seqStep++;
     sequence = false;
-    startRace();
+    // Start race with elapsed time already at 5 minutes (300000ms)
+    // so overtime counting continues from +0:00
+    running = true;
+    startTime = seqStart;  // Use sequence start time, not current time
   }
 }
 
