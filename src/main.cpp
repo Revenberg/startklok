@@ -10,20 +10,22 @@
 #include "relay.h"
 #include "RaceController.h"
 #include "WebUI.h"
-#include "lcd.h"
 #include "version.h"
 #include "schedule.h"
+#include <RTClib.h>
 
 // ================= CONTROLLER INSTANCES =================
 RaceController raceController;
 WebUI webUI;
+RTC_DS3231 rtc;
 
 // ================= SERVER =================
 WebServer server(80);
 
 // ================= BROADCAST THROTTLE =================
 unsigned long lastBroadcast = 0;
-const unsigned long BROADCAST_INTERVAL = 100; // ms
+// ================= CONSTANTS =================
+const unsigned long BROADCAST_INTERVAL = 500; // ms - broadcast state every 500ms (2x per second)
 
 // ================= HORN =================
 const int HORN = 18;
@@ -157,7 +159,24 @@ void setup() {
 
   Serial.println("Initializing hardware...");
   relayInit();
-  lcdInit();
+  
+  // Initialize RTC
+  Serial.println("Initializing DS3231 RTC...");
+  if (!rtc.begin()) {
+    Serial.println("[ERROR] RTC not found!");
+  } else {
+    Serial.println("[RTC] DS3231 initialized");
+    
+    if (rtc.lostPower()) {
+      Serial.println("[RTC] RTC lost power, setting time from compile time");
+      rtc.adjust(DateTime(F(__DATE__), F(__TIME__)));
+    }
+    
+    DateTime now = rtc.now();
+    Serial.printf("[RTC] Current time: %04d-%02d-%02d %02d:%02d:%02d\n",
+                  now.year(), now.month(), now.day(),
+                  now.hour(), now.minute(), now.second());
+  }
   
   Serial.println("Initializing race controller...");
   raceController.begin();
@@ -165,9 +184,27 @@ void setup() {
   Serial.println("Loading schedule...");
   schedule.begin();
   
-  // Configure NTP for time synchronization (GMT+1 = 3600, DST = 3600)
+  // Configure NTP for time synchronization and sync to RTC
   Serial.println("Configuring NTP...");
   configTime(3600, 3600, "pool.ntp.org", "time.nist.gov");
+  
+  // Wait for NTP sync and update RTC
+  if (cfg.mode == "STA" && WiFi.status() == WL_CONNECTED) {
+    Serial.println("[NTP] Waiting for time sync...");
+    struct tm timeinfo;
+    if (getLocalTime(&timeinfo, 10000)) {
+      Serial.printf("[NTP] Time synced: %04d-%02d-%02d %02d:%02d:%02d\n",
+                    timeinfo.tm_year + 1900, timeinfo.tm_mon + 1, timeinfo.tm_mday,
+                    timeinfo.tm_hour, timeinfo.tm_min, timeinfo.tm_sec);
+      
+      // Update RTC with NTP time
+      rtc.adjust(DateTime(timeinfo.tm_year + 1900, timeinfo.tm_mon + 1, timeinfo.tm_mday,
+                          timeinfo.tm_hour, timeinfo.tm_min, timeinfo.tm_sec));
+      Serial.println("[RTC] Updated from NTP");
+    } else {
+      Serial.println("[NTP] Time sync failed");
+    }
+  }
   
   // Print IP address
   if (cfg.mode == "STA" && WiFi.status() == WL_CONNECTED) {
@@ -181,9 +218,24 @@ void setup() {
   Serial.println("Starting WebSocket server...");
   webUI.begin();
   
-  registerConfigRoutes(server);
+  // Set WebSocket message handler
+  webUI.setMessageHandler([](String message) {
+    Serial.printf("[WS] Processing message: %s\n", message.c_str());
+    
+    if (message == "start") {
+      Serial.println("[WS] Starting race sequence");
+      startSequence();
+    }
+    else if (message == "cancel") {
+      Serial.println("[WS] Canceling race");
+      cancelRace();
+    }
+    else {
+      Serial.printf("[WS] Unknown command: %s\n", message.c_str());
+    }
+  });
   
-  lcdShowIdle(cfg.mode, cfg.ssid);
+  registerConfigRoutes(server);
 
   // ================= ROUTES =================
   server.on("/", handleRoot);
@@ -264,29 +316,6 @@ void setup() {
     },
     handleOTAUpload
   );
-
-  // ================= WEBSOCKET EVENT HANDLER =================
-  webUI.ws.onEvent([](uint8_t num, WStype_t type, uint8_t * payload, size_t len) {
-    if (type == WStype_CONNECTED) {
-      Serial.printf("[WS] Client #%u connected\n", num);
-    }
-    else if (type == WStype_DISCONNECTED) {
-      Serial.printf("[WS] Client #%u disconnected\n", num);
-    }
-    else if (type == WStype_TEXT) {
-      String msg = String((char*)payload);
-      Serial.printf("[WS] Received: %s\n", msg.c_str());
-      
-      if (msg == "start") {
-        Serial.println("[WS] Starting race sequence...");
-        startSequence();
-      }
-      else if (msg == "cancel") {
-        Serial.println("[WS] Canceling race...");
-        cancelRace();
-      }
-    }
-  });
 
   Serial.println("Starting web server on port 80...");
   server.begin();
@@ -376,25 +405,16 @@ void loop() {
   if (millis() - lastScheduleCheck >= 60000) { // Check every minute
     lastScheduleCheck = millis();
     
-    // Get current time (you need to set time via NTP or manually)
-    struct tm timeinfo;
-    if (getLocalTime(&timeinfo)) {
-      int scheduleIndex = schedule.checkStartTime(timeinfo.tm_hour, timeinfo.tm_min);
-      
-      if (scheduleIndex >= 0 && !raceController.isSequence() && !raceController.isRunning()) {
-        Serial.printf("[SCHEDULE] Auto-starting for scheduled time: %s\n", 
-                      schedule.getTime(scheduleIndex).toString().c_str());
-        startSequence();
-        schedule.markCompleted(scheduleIndex);
-      }
+    // Get current time from RTC
+    DateTime now = rtc.now();
+    int scheduleIndex = schedule.checkStartTime(now.hour(), now.minute());
+    
+    if (scheduleIndex >= 0 && !raceController.isSequence() && !raceController.isRunning()) {
+      Serial.printf("[SCHEDULE] Auto-starting for scheduled time: %s\n", 
+                    schedule.getTime(scheduleIndex).toString().c_str());
+      startSequence();
+      schedule.markCompleted(scheduleIndex);
     }
-  }
-
-  // Update LCD display
-  if (raceController.isRunning() || raceController.isSequence()) {
-    lcdShowRace(raceController.getRemaining());
-  } else {
-    lcdShowIdle(cfg.mode, cfg.ssid);
   }
 
   // Throttled WebSocket broadcast
@@ -404,7 +424,8 @@ void loop() {
     webUI.broadcastState(
       raceController.isRunning(),
       raceController.isSequence(),
-      raceController.getRemaining()
+      raceController.getRemaining(),
+      raceController.getElapsed()
     );
   }
 }

@@ -101,9 +101,9 @@ h1 {
 
 #flagContainer {
   display: flex;
-  flex-direction: row;
+  flex-direction: column;
   align-items: center;
-  gap: 10px;
+  gap: 5px;
 }
 
 .flag {
@@ -115,12 +115,10 @@ h1 {
   display: none;
   position: relative;
   overflow: hidden;
-  align-items: center;
-  justify-content: center;
 }
 
 .flag.active {
-  display: flex;
+  display: block;
   animation: flagWave 0.5s ease-in-out;
 }
 
@@ -133,12 +131,18 @@ h1 {
 /* Klassevlag - Scouting Nederland (paars met gele lelie) */
 .flag-class {
   background: linear-gradient(135deg, #6b2d87 0%, #8b3da7 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
   font-size: 24px;
 }
 
 /* P-vlag (blauw met wit vierkant) */
 .flag-p {
   background: #0051ba;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .flag-p::before {
@@ -152,6 +156,9 @@ h1 {
 /* P-vlag down (blauw met wit vierkant en rode X) */
 .flag-p-down {
   background: #0051ba;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .flag-p-down::before {
@@ -233,13 +240,6 @@ button:active {
 
 #cancelBtn:hover {
   background: linear-gradient(135deg, #ff5555 0%, #dd1111 100%);
-}
-
-button:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-  transform: none !important;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2) !important;
 }
 
 .setup-link {
@@ -459,91 +459,61 @@ function connectWebSocket() {
 
 // ================= DISPLAY UPDATE =================
 function updateDisplay(data) {
-  console.log("📊 Data received:", data);
-  
-  const remaining = data.remaining || 0;
-  const elapsed = data.elapsed || 0;
-  
-  // Update status text and timer
-  if (data.running && remaining === 0 && elapsed > 0) {
-    // Race gestart - toon elapsed tijd
-    statusEl.textContent = "🏁 RACE GESTART";
-    const sec = Math.floor(elapsed / 1000);
-    const m = Math.floor(sec / 60);
-    const s = sec % 60;
-    timerEl.textContent = m + ":" + (s < 10 ? "0" : "") + s;
-    timerEl.style.color = "#00ff88";
+  // Update status text
+  if (data.phase) {
+    statusEl.textContent = data.phase;
+  } else if (data.running) {
+    statusEl.textContent = data.sequence ? "COUNTDOWN" : "RUNNING";
   } else {
-    // Countdown of ready state
-    if (data.phase) {
-      statusEl.textContent = data.phase;
-    } else if (data.sequence) {
-      statusEl.textContent = "⏱️ COUNTDOWN";
-    } else if (data.running) {
-      statusEl.textContent = "🏁 RUNNING";
-    } else {
-      statusEl.textContent = "✅ READY";
-    }
-    
-    // Update countdown timer
-    const sec = Math.max(0, Math.floor(remaining / 1000));
-    const m = Math.floor(sec / 60);
-    const s = sec % 60;
-    timerEl.textContent = m + ":" + (s < 10 ? "0" : "") + s;
-    
-    // Color coding
-    if (remaining > 60000) {
-      timerEl.style.color = "#00ff88";
-    } else if (remaining > 30000) {
-      timerEl.style.color = "#ffaa00";
-    } else if (remaining > 0) {
-      timerEl.style.color = "#ff4444";
-    } else {
-      timerEl.style.color = "#00ff88";
-    }
+    statusEl.textContent = "READY";
+  }
+  
+  // Update timer
+  const remaining = data.remaining || 0;
+  const sec = Math.max(0, Math.floor(remaining / 1000));
+  const m = Math.floor(sec / 60);
+  const s = sec % 60;
+  
+  timerEl.textContent = m + ":" + (s < 10 ? "0" : "") + s;
+  
+  // Color coding
+  if (remaining > 60000) {
+    timerEl.style.color = "#00ff88";
+  } else if (remaining > 30000) {
+    timerEl.style.color = "#ffaa00";
+  } else if (remaining > 0) {
+    timerEl.style.color = "#ff4444";
+  } else {
+    timerEl.style.color = "#00ff88";
   }
   
   // Update flag display
-  console.log("🚩 Updating flag to:", data.flag);
   updateFlag(data.flag);
-  
-  // Disable start button during countdown or race
-  const startBtn = document.getElementById('startBtn');
-  if (data.sequence || data.running) {
-    startBtn.disabled = true;
-  } else {
-    startBtn.disabled = false;
-  }
 }
 
 // ================= FLAG DISPLAY =================
 function updateFlag(flag) {
-  console.log("🎌 updateFlag called with:", flag);
-  const classFlag = document.getElementById('flagClass');
-  const pFlag = document.getElementById('flagP');
+  const flags = {
+    'class': { el: document.getElementById('flagClass'), label: 'Klassevlag' },
+    'p': { el: document.getElementById('flagP'), label: 'P-Vlag (Voorbereiden)' },
+    'p-down': { el: document.getElementById('flagPDown'), label: 'P-Vlag Neer (1 minuut)' },
+    'racing': { el: document.getElementById('flagRacing'), label: 'Race Gestart!' },
+    'none': { el: null, label: '' }
+  };
+  
+  // Hide all flags
+  Object.values(flags).forEach(f => {
+    if (f.el) f.el.classList.remove('active');
+  });
+  
+  // Show active flag
   const labelEl = document.getElementById('flagLabel');
-  
-  console.log("  Elements:", { classFlag, pFlag, labelEl });
-  
-  // Hide all flags first
-  if (classFlag) classFlag.classList.remove('active');
-  if (pFlag) pFlag.classList.remove('active');
-  
-  // Show flags based on state
-  if (flag === 'class') {
-    // 5:00-4:00 en 1:00-0:00: Alleen Klassevlag
-    console.log("  → Showing Klassevlag only");
-    if (classFlag) classFlag.classList.add('active');
-    labelEl.textContent = 'Klassevlag';
-  } else if (flag === 'class-p') {
-    // 4:00-1:00: Beide vlaggen
-    console.log("  → Showing both flags");
-    if (classFlag) classFlag.classList.add('active');
-    if (pFlag) pFlag.classList.add('active');
-    labelEl.textContent = 'Klassevlag + P-Vlag';
+  if (flag && flags[flag]) {
+    if (flags[flag].el) {
+      flags[flag].el.classList.add('active');
+    }
+    labelEl.textContent = flags[flag].label;
   } else {
-    // Geen vlaggen
-    console.log("  → Hiding all flags");
     labelEl.textContent = '';
   }
 }
@@ -566,11 +536,7 @@ function updateClock() {
   const now = new Date();
   const h = String(now.getHours()).padStart(2, '0');
   const m = String(now.getMinutes()).padStart(2, '0');
-  const s = String(now.getSeconds()).padStart(2, '0');
-  document.getElementById('clock').textContent = h + ':' + m + ':' + s;
-}
-
-// ================= SCHEDULE =================
+  const s = String(noSCHEDULE =================
 function loadSchedule() {
   fetch('/schedule')
     .then(r => r.json())

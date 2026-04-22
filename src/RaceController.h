@@ -15,6 +15,7 @@ public:
   int getStep();
 
   unsigned long getRemaining();
+  unsigned long getElapsed();
 
 private:
 

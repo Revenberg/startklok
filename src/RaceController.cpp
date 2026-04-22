@@ -35,6 +35,13 @@ unsigned long RaceController::getRemaining() {
   return 0;
 }
 
+unsigned long RaceController::getElapsed() {
+  if (running) {
+    return millis() - startTime;
+  }
+  return 0;
+}
+
 void RaceController::startRace() {
   running = true;
   startTime = millis();
@@ -67,8 +74,5 @@ void RaceController::stepSequence() {
 
 void RaceController::update() {
   stepSequence();
-
-  if (running && getRemaining() == 0) {
-    running = false;
-  }
+  // Race blijft lopen, geen auto-stop meer
 }
