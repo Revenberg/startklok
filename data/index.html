@@ -3,151 +3,629 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
-<title>ESP Race Dashboard</title>
+<title>⛵ Race Dashboard</title>
 
 <style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
 body {
-  font-family: Arial, sans-serif;
-  background: #0f0f0f;
+  font-family: 'Segoe UI', Arial, sans-serif;
+  background: linear-gradient(135deg, #0a0a0a 0%, #1a1a1a 100%);
   color: white;
   text-align: center;
-  margin: 0;
   padding: 20px;
+  min-height: 100vh;
 }
 
-h1 {
-  font-size: 32px;
-  margin-bottom: 10px;
+#topbar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  background: rgba(0, 0, 0, 0.8);
+  padding: 15px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid #333;
+  z-index: 100;
 }
 
 #clock {
-  font-size: 20px;
-  color: #aaa;
-}
-
-#timer {
-  font-size: 80px;
-  font-weight: bold;
-  margin: 30px 0;
-  color: #00ff88;
-}
-
-#status {
   font-size: 18px;
-  color: #888;
-  margin-bottom: 20px;
+  color: #00ff88;
+  font-weight: bold;
+  font-variant-numeric: tabular-nums;
 }
 
-button {
-  font-size: 24px;
-  padding: 15px 40px;
-  margin: 10px;
-  border: none;
-  border-radius: 10px;
-  cursor: pointer;
+#connection {
+  font-size: 14px;
+  padding: 5px 12px;
+  border-radius: 20px;
+  background: #333;
 }
 
-#start {
-  background: #28a745;
-  color: white;
+#connection.connected { background: #00aa44; color: white; }
+#connection.disconnected { background: #aa0000; color: white; }
+
+.container {
+  max-width: 800px;
+  margin: 80px auto 20px;
 }
 
-#cancel {
-  background: #dc3545;
-  color: white;
-}
-
-#setup {
-  background: #444;
-  color: white;
-  font-size: 16px;
-  padding: 10px 20px;
+h1 {
+  font-size: 42px;
+  margin-bottom: 30px;
+  background: linear-gradient(135deg, #00ff88 0%, #00ccff 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
 }
 
 .card {
-  background: #1a1a1a;
-  padding: 15px;
-  margin: 15px auto;
-  max-width: 400px;
+  background: rgba(26, 26, 26, 0.8);
+  border-radius: 20px;
+  padding: 40px;
+  margin: 30px 0;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+  border: 1px solid #333;
+  backdrop-filter: blur(10px);
+}
+
+#status {
+  font-size: 24px;
+  margin-bottom: 20px;
+  color: #aaa;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  font-weight: 600;
+}
+
+#timer {
+  font-size: 96px;
+  font-weight: bold;
+  color: #00ff88;
+  font-variant-numeric: tabular-nums;
+  text-shadow: 0 0 30px rgba(0, 255, 136, 0.5);
+  margin: 20px 0;
+  line-height: 1;
+}
+
+#flagContainer {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin: 30px 0;
+  min-height: 200px;
+}
+
+.flag {
+  width: 180px;
+  height: 120px;
+  border-radius: 8px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+  border: 2px solid #333;
+  display: none;
+  position: relative;
+  overflow: hidden;
+}
+
+.flag.active {
+  display: block;
+  animation: flagWave 0.5s ease-in-out;
+}
+
+@keyframes flagWave {
+  0% { transform: scale(0.8) rotate(-5deg); opacity: 0; }
+  50% { transform: scale(1.05) rotate(2deg); }
+  100% { transform: scale(1) rotate(0deg); opacity: 1; }
+}
+
+/* Klassevlag - Scouting Nederland (paars met gele lelie) */
+.flag-class {
+  background: linear-gradient(135deg, #6b2d87 0%, #8b3da7 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 60px;
+}
+
+/* P-vlag (blauw met wit vierkant) */
+.flag-p {
+  background: #0051ba;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.flag-p::before {
+  content: "";
+  width: 60px;
+  height: 60px;
+  background: white;
+  display: block;
+}
+
+/* P-vlag down (blauw met wit vierkant en rode X) */
+.flag-p-down {
+  background: #0051ba;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.flag-p-down::before {
+  content: "✕";
+  width: 60px;
+  height: 60px;
+  background: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 48px;
+  color: #ff0000;
+  font-weight: bold;
+}
+
+/* Racing - geen vlag / finish */
+.flag-racing {
+  background: repeating-linear-gradient(
+    45deg,
+    #000,
+    #000 15px,
+    #fff 15px,
+    #fff 30px
+  );
+}
+
+.flag-label {
+  text-align: center;
+  margin-top: 15px;
+  font-size: 14px;
+  color: #aaa;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.controls {
+  display: flex;
+  gap: 15px;
+  justify-content: center;
+  flex-wrap: wrap;
+  margin-top: 30px;
+}
+
+button {
+  font-size: 20px;
+  padding: 18px 45px;
+  border: none;
   border-radius: 12px;
+  cursor: pointer;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+}
+
+button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4);
+}
+
+button:active {
+  transform: translateY(0);
+}
+
+#startBtn {
+  background: linear-gradient(135deg, #00ff88 0%, #00cc66 100%);
+  color: #000;
+}
+
+#startBtn:hover {
+  background: linear-gradient(135deg, #00ffaa 0%, #00dd77 100%);
+}
+
+#cancelBtn {
+  background: linear-gradient(135deg, #ff4444 0%, #cc0000 100%);
+  color: white;
+}
+
+#cancelBtn:hover {
+  background: linear-gradient(135deg, #ff5555 0%, #dd1111 100%);
+}
+
+.setup-link {
+  display: inline-block;
+  margin-top: 30px;
+  padding: 12px 30px;
+  background: rgba(255, 255, 255, 0.1);
+  color: #00ff88;
+  text-decoration: none;
+  border-radius: 8px;
+  border: 1px solid #333;
+  transition: all 0.3s ease;
+}
+
+.setup-link:hover {
+  background: rgba(255, 255, 255, 0.15);
+  border-color: #00ff88;
+  transform: translateY(-2px);
+}
+
+#version {
+  position: fixed;
+  bottom: 10px;
+  right: 15px;
+  font-size: 12px;
+  color: #555;
+  background: rgba(0, 0, 0, 0.5);
+  padding: 5px 10px;
+  border-radius: 5px;
+  font-family: monospace;
+}
+
+.schedule-card {
+  text-align: left;
+}
+
+.schedule-card h2 {
+  font-size: 24px;
+  margin-bottom: 15px;
+  color: #00ff88;
+}
+
+.schedule-list {
+  list-style: none;
+  margin: 20px 0;
+}
+
+.schedule-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px;
+  margin: 8px 0;
+  background: rgba(0, 0, 0, 0.3);
+  border-radius: 8px;
+  border: 1px solid #333;
+}
+
+.schedule-time {
+  font-size: 20px;
+  font-weight: bold;
+  color: #00ff88;
+  font-variant-numeric: tabular-nums;
+}
+
+.schedule-time.completed {
+  color: #666;
+  text-decoration: line-through;
+}
+
+.btn-delete {
+  background: #ff4444;
+  color: white;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: all 0.2s;
+}
+
+.btn-delete:hover {
+  background: #ff5555;
+}
+
+.schedule-add {
+  display: flex;
+  gap: 10px;
+  margin-top: 15px;
+  align-items: center;
+}
+
+.schedule-add input {
+  flex: 1;
+  padding: 12px;
+  border-radius: 8px;
+  border: 1px solid #333;
+  background: rgba(0, 0, 0, 0.3);
+  color: white;
+  font-size: 16px;
+}
+
+.btn-add {
+  background: #00ff88;
+  color: #000;
+  border: none;
+  padding: 12px 24px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 16px;
+  font-weight: 600;
+  transition: all 0.2s;
+}
+
+.btn-add:hover {
+  background: #00ffaa;
+}
+
+@media (max-width: 600px) {
+  h1 { font-size: 32px; }
+  #timer { font-size: 72px; }
+  button { font-size: 18px; padding: 15px 35px; }
+  .card { padding: 25px; }
 }
 </style>
 </head>
 
 <body>
 
-<h1>⛵ ESP Race Dashboard</h1>
-
-<div id="clock">--:--:--</div>
-
-<div class="card">
-  <div id="status">Laden...</div>
-  <div id="timer">--:--</div>
+<div id="topbar">
+  <div id="clock">--:--:--</div>
+  <div id="connection" class="disconnected">●  CONNECTING</div>
 </div>
 
-<button id="start" onclick="startRace()">START</button>
-<button id="cancel" onclick="cancelRace()">CANCEL</button>
+<div class="container">
+  <h1>⛵ Race Controller</h1>
 
-<br>
+  <div class="card">
+    <div id="status">LOADING...</div>
+    <div id="timer">--:--</div>
+    
+    <div id="flagContainer">
+      <div>
+        <div class="flag flag-class" id="flagClass">⚜️</div>
+        <div class="flag flag-p" id="flagP"></div>
+        <div class="flag flag-p-down" id="flagPDown"></div>
+        <div class="flag flag-racing" id="flagRacing"></div>
+        <div class="flag-label" id="flagLabel"></div>
+      </div>
+    </div>
+  </div>
 
-<button id="setup" onclick="goSetup()">SETUP</button>
+  <div class="controls">
+    <button id="startBtn" onclick="startRace()">▶ Start</button>
+    <button id="cancelBtn" onclick="cancelRace()">■ Cancel</button>
+  </div>
 
-<div style="position:fixed; bottom:10px; right:15px; font-size:12px; color:#555;" id="version">v0.0.0</div>
+  <div class="card schedule-card">
+    <h2>📅 Schema Start Tijden</h2>
+    <p style="color: #aaa; margin-bottom: 15px;">Races starten automatisch 5 minuten voor geplande tijd</p>
+    
+    <ul id="scheduleList" class="schedule-list">
+      <!-- Schedule items loaded here -->
+    </ul>
+    
+    <div class="schedule-add">
+      <input type="time" id="newTime" placeholder="HH:MM">
+      <button class="btn-add" onclick="addScheduleTime()">+ Toevoegen</button>
+    </div>
+  </div>
+
+  <a href="/setup" class="setup-link">⚙ WiFi Setup</a>
+</div>
+
+<div id="version">v0.0.0</div>
 
 <script>
 
+// ================= ELEMENTS =================
+const statusEl = document.getElementById("status");
+const timerEl = document.getElementById("timer");
+const clockEl = document.getElementById("clock");
+const connectionEl = document.getElementById("connection");
+const versionEl = document.getElementById("version");
+
+// ================= WEBSOCKET =================
+let ws;
+let reconnectTimer;
+
+function connectWebSocket() {
+  ws = new WebSocket("ws://" + location.hostname + ":81");
+  
+  ws.onopen = () => {
+    connectionEl.textContent = "●  CONNECTED";
+    connectionEl.className = "connected";
+    clearTimeout(reconnectTimer);
+  };
+  
+  ws.onclose = () => {
+    connectionEl.textContent = "●  DISCONNECTED";
+    connectionEl.className = "disconnected";
+    reconnectTimer = setTimeout(connectWebSocket, 3000);
+  };
+  
+  ws.onerror = () => {
+    ws.close();
+  };
+  
+  ws.onmessage = (e) => {
+    try {
+      const data = JSON.parse(e.data);
+      updateDisplay(data);
+    } catch (err) {
+      console.error("Parse error:", err);
+    }
+  };
+}
+
+// ================= DISPLAY UPDATE =================
+function updateDisplay(data) {
+  // Update status text
+  if (data.phase) {
+    statusEl.textContent = data.phase;
+  } else if (data.running) {
+    statusEl.textContent = data.sequence ? "COUNTDOWN" : "RUNNING";
+  } else {
+    statusEl.textContent = "READY";
+  }
+  
+  // Update timer
+  const remaining = data.remaining || 0;
+  const sec = Math.max(0, Math.floor(remaining / 1000));
+  const m = Math.floor(sec / 60);
+  const s = sec % 60;
+  
+  timerEl.textContent = m + ":" + (s < 10 ? "0" : "") + s;
+  
+  // Color coding
+  if (remaining > 60000) {
+    timerEl.style.color = "#00ff88";
+  } else if (remaining > 30000) {
+    timerEl.style.color = "#ffaa00";
+  } else if (remaining > 0) {
+    timerEl.style.color = "#ff4444";
+  } else {
+    timerEl.style.color = "#00ff88";
+  }
+  
+  // Update flag display
+  updateFlag(data.flag);
+}
+
+// ================= FLAG DISPLAY =================
+function updateFlag(flag) {
+  const flags = {
+    'class': { el: document.getElementById('flagClass'), label: 'Klassevlag' },
+    'p': { el: document.getElementById('flagP'), label: 'P-Vlag (Voorbereiden)' },
+    'p-down': { el: document.getElementById('flagPDown'), label: 'P-Vlag Neer (1 minuut)' },
+    'racing': { el: document.getElementById('flagRacing'), label: 'Race Gestart!' },
+    'none': { el: null, label: '' }
+  };
+  
+  // Hide all flags
+  Object.values(flags).forEach(f => {
+    if (f.el) f.el.classList.remove('active');
+  });
+  
+  // Show active flag
+  const labelEl = document.getElementById('flagLabel');
+  if (flag && flags[flag]) {
+    if (flags[flag].el) {
+      flags[flag].el.classList.add('active');
+    }
+    labelEl.textContent = flags[flag].label;
+  } else {
+    labelEl.textContent = '';
+  }
+}
+
+// ================= CONTROLS =================
 function startRace() {
-  fetch('/start');
+  if (ws && ws.readyState === WebSocket.OPEN) {
+    ws.send("start");
+  }
 }
 
 function cancelRace() {
-  fetch('/cancel');
+  if (ws && ws.readyState === WebSocket.OPEN) {
+    ws.send("cancel");
+  }
 }
 
-function goSetup() {
-  window.location.href = "/setup";
-}
-
-// format seconds → M:SS
-function formatTime(sec) {
-  let m = Math.floor(sec / 60);
-  let s = sec % 60;
-  return m + ":" + (s < 10 ? "0" : "") + s;
-}
-
-function update() {
-  fetch('/status')
+// ================= CLOCK =================
+function updateClock() {
+  const now = new Date();
+  const h = String(now.getHours()).padStart(2, '0');
+  const m = String(now.getMinutes()).padStart(2, '0');
+  const s = String(noSCHEDULE =================
+function loadSchedule() {
+  fetch('/schedule')
     .then(r => r.json())
     .then(data => {
-
-      document.getElementById("clock").innerText = data.time;
-
-      if (data.running) {
-        document.getElementById("status").innerText = "RACE ACTIEF";
-        document.getElementById("timer").innerText = formatTime(data.remaining);
-      } else {
-        document.getElementById("status").innerText = "KLAAR VOOR START";
-        document.getElementById("timer").innerText = "READY";
-      }
-
-      if (data.scheduled && data.scheduled > 0) {
-        document.getElementById("status").innerText += " | GESCHEDULED";
+      const list = document.getElementById('scheduleList');
+      list.innerHTML = '';
+      
+      if (data.length === 0) {
+        list.innerHTML = '<li style="color: #666; text-align: center;">Geen tijden gepland</li>';
+        return;
       }
       
-      // Update version number
-      if (data.version) {
-        document.getElementById("version").innerText = data.version;
-      }
-
+      data.forEach((item, index) => {
+        const li = document.createElement('li');
+        li.className = 'schedule-item';
+        
+        const timeSpan = document.createElement('span');
+        timeSpan.className = 'schedule-time' + (item.completed ? ' completed' : '');
+        timeSpan.textContent = item.time;
+        
+        const deleteBtn = document.createElement('button');
+        deleteBtn.className = 'btn-delete';
+        deleteBtn.textContent = '× Verwijder';
+        deleteBtn.onclick = () => deleteScheduleTime(index);
+        
+        li.appendChild(timeSpan);
+        li.appendChild(deleteBtn);
+        list.appendChild(li);
+      });
     })
-    .catch(() => {
-      document.getElementById("status").innerText = "VERBINDINGSFOUT";
-    });
+    .catch(err => console.error("Schedule fetch error:", err));
 }
 
-setInterval(update, 500);
-update();
+function addScheduleTime() {
+  const input = document.getElementById('newTime');
+  const time = input.value;
+  
+  if (!time) {
+    alert('Voer een tijd in');
+    return;
+  }
+  
+  fetch('/schedule', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: 'time=' + encodeURIComponent(time)
+  })
+  .then(r => {
+    if (r.ok) {
+      input.value = '';
+      loadSchedule();
+    } else {
+      alert('Fout bij toevoegen tijd');
+    }
+  })
+  .catch(err => console.error("Add time error:", err));
+}
+
+function deleteScheduleTime(index) {
+  if (!confirm('Deze tijd verwijderen?')) return;
+  
+  fetch('/schedule?index=' + index, {
+    method: 'DELETE'
+  })
+  .then(r => {
+    if (r.ok) {
+      loadSchedule();
+    } else {
+      alert('Fout bij verwijderen tijd');
+    }
+  })
+  .catch(err => console.error("Delete time error:", err));
+}
+
+// ================= INIT =================
+connectWebSocket();
+updateClock();
+setInterval(updateClock, 1000);
+loadSchedule();
+setInterval(loadSchedule, 10000); // Reload schedule every 10 seconds
+// ================= VERSION =================
+fetch('/status')
+  .then(r => r.json())
+  .then(data => {
+    if (data.version) {
+      versionEl.textContent = data.version;
+    }
+  })
+  .catch(err => console.error("Status fetch error:", err));
+
+// ================= INIT =================
+connectWebSocket();
+updateClock();
+setInterval(updateClock, 1000);
 
 </script>
 

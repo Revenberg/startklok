@@ -4,6 +4,7 @@
 #include <WebSocketsServer.h>
 #include <LittleFS.h>
 #include <Update.h>
+#include <time.h>
 
 #include "config.h"
 #include "relay.h"
@@ -11,6 +12,7 @@
 #include "WebUI.h"
 #include "lcd.h"
 #include "version.h"
+#include "schedule.h"
 
 // ================= CONTROLLER INSTANCES =================
 RaceController raceController;
@@ -151,12 +153,13 @@ void setup() {
   
   Serial.println("Initializing race controller...");
   raceController.begin();
-
-  Serial.println("Loading config...");
-  loadConfig();
   
-  Serial.println("Starting WiFi...");
-  startWiFi();
+  Serial.println("Loading schedule...");
+  schedule.begin();
+  
+  // Configure NTP for time synchronization (GMT+1 = 3600, DST = 3600)
+  Serial.println("Configuring NTP...");
+  configTime(3600, 3600, "pool.ntp.org", "time.nist.gov");
   
   // Print IP address
   if (cfg.mode == "STA" && WiFi.status() == WL_CONNECTED) {
@@ -180,6 +183,48 @@ void setup() {
   server.on("/status", handleStatus);
   
   server.on("/version", handleVersion);
+
+  // ================= SCHEDULE =================
+  server.on("/schedule", HTTP_GET, []() {
+    server.send(200, "application/json", schedule.toJson());
+  });
+  
+  server.on("/schedule", HTTP_POST, []() {
+    if (!server.hasArg("time")) {
+      server.send(400, "text/plain", "Missing time parameter");
+      return;
+    }
+    
+    String timeStr = server.arg("time");
+    int colonPos = timeStr.indexOf(':');
+    if (colonPos <= 0) {
+      server.send(400, "text/plain", "Invalid time format");
+      return;
+    }
+    
+    int hour = timeStr.substring(0, colonPos).toInt();
+    int minute = timeStr.substring(colonPos + 1).toInt();
+    
+    if (schedule.addTime(hour, minute)) {
+      server.send(200, "application/json", schedule.toJson());
+    } else {
+      server.send(400, "text/plain", "Failed to add time");
+    }
+  });
+  
+  server.on("/schedule", HTTP_DELETE, []() {
+    if (!server.hasArg("index")) {
+      server.send(400, "text/plain", "Missing index parameter");
+      return;
+    }
+    
+    int index = server.arg("index").toInt();
+    if (schedule.removeTime(index)) {
+      server.send(200, "application/json", schedule.toJson());
+    } else {
+      server.send(400, "text/plain", "Failed to remove time");
+    }
+  });
 
   server.on("/relay", handleRelay);
 
@@ -214,10 +259,24 @@ void setup() {
 
   // ================= WEBSOCKET EVENT HANDLER =================
   webUI.ws.onEvent([](uint8_t num, WStype_t type, uint8_t * payload, size_t len) {
-    if (type == WStype_TEXT) {
+    if (type == WStype_CONNECTED) {
+      Serial.printf("[WS] Client #%u connected\n", num);
+    }
+    else if (type == WStype_DISCONNECTED) {
+      Serial.printf("[WS] Client #%u disconnected\n", num);
+    }
+    else if (type == WStype_TEXT) {
       String msg = String((char*)payload);
-      if (msg == "start") startSequence();
-      if (msg == "cancel") cancelRace();
+      Serial.printf("[WS] Received: %s\n", msg.c_str());
+      
+      if (msg == "start") {
+        Serial.println("[WS] Starting race sequence...");
+        startSequence();
+      }
+      else if (msg == "cancel") {
+        Serial.println("[WS] Canceling race...");
+        cancelRace();
+      }
     }
   });
 
@@ -240,7 +299,88 @@ void loop() {
   webUI.update();
   server.handleClient();
 
+  // Track sequence step changes and relay timing
+  static int lastStep = -1;
+  static unsigned long relayOnTime = 0;
+  static int activeRelay = 0;
+  
+  int currentStep = raceController.getStep();
+  
+  // Trigger signals when step changes
+  if (raceController.isSequence() && currentStep != lastStep) {
+    lastStep = currentStep;
+    
+    // Trigger signals based on step
+    switch (currentStep) {
+      case 1: // 5 minutes - Warning signal
+        Serial.println("[RACE] 5 minuten - Waarschuwing signaal");
+        relaySet(1, 1); // Relay 1 ON
+        horn(500); // Horn tone
+        activeRelay = 1;
+        relayOnTime = millis();
+        break;
+        
+      case 2: // 4 minutes - Preparatory signal  
+        Serial.println("[RACE] 4 minuten - Voorbereidend signaal");
+        relaySet(2, 1); // Relay 2 ON
+        horn(500);
+        activeRelay = 2;
+        relayOnTime = millis();
+        break;
+        
+      case 3: // 1 minute - One minute signal
+        Serial.println("[RACE] 1 minuut - Een minuut signaal");
+        relaySet(3, 1); // Relay 3 ON
+        horn(500);
+        activeRelay = 3;
+        relayOnTime = millis();
+        break;
+        
+      case 4: // START!
+        Serial.println("[RACE] START!");
+        relaySet(4, 1); // Relay 4 ON
+        horn(1000); // Long horn blast
+        activeRelay = 4;
+        relayOnTime = millis();
+        break;
+    }
+  }
+  
+  // Turn off relay after 2 seconds
+  if (activeRelay > 0 && (millis() - relayOnTime >= 2000)) {
+    relaySet(activeRelay, 0); // Turn off relay
+    Serial.printf("[RACE] Relay %d UIT na 2 seconden\n", activeRelay);
+    activeRelay = 0;
+  }
+  
+  // Reset when sequence is cancelled
+  if (!raceController.isSequence() && lastStep != -1) {
+    lastStep = -1;
+    activeRelay = 0;
+    relayReset(); // Turn off all relays
+    Serial.println("[RACE] Reeks geannuleerd - relays gereset");
+  }
+
   raceController.update();
+  
+  // Check scheduled starts (every minute)
+  static unsigned long lastScheduleCheck = 0;
+  if (millis() - lastScheduleCheck >= 60000) { // Check every minute
+    lastScheduleCheck = millis();
+    
+    // Get current time (you need to set time via NTP or manually)
+    struct tm timeinfo;
+    if (getLocalTime(&timeinfo)) {
+      int scheduleIndex = schedule.checkStartTime(timeinfo.tm_hour, timeinfo.tm_min);
+      
+      if (scheduleIndex >= 0 && !raceController.isSequence() && !raceController.isRunning()) {
+        Serial.printf("[SCHEDULE] Auto-starting for scheduled time: %s\n", 
+                      schedule.getTime(scheduleIndex).toString().c_str());
+        startSequence();
+        schedule.markCompleted(scheduleIndex);
+      }
+    }
+  }
 
   // Update LCD display
   if (raceController.isRunning() || raceController.isSequence()) {

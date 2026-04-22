@@ -41,19 +41,29 @@ void saveConfig() {
 void startWiFi() {
 
   if (cfg.mode == "STA") {
-
+    Serial.printf("Connecting to WiFi SSID: %s\n", cfg.ssid.c_str());
+    
     WiFi.mode(WIFI_STA);
     WiFi.begin(cfg.ssid.c_str(), cfg.pass.c_str());
 
     int t = 0;
     while (WiFi.status() != WL_CONNECTED && t < 20) {
       delay(500);
+      Serial.print(".");
       t++;
     }
+    Serial.println();
 
-    if (WiFi.status() == WL_CONNECTED) return;
+    if (WiFi.status() == WL_CONNECTED) {
+      Serial.println("STA mode: Connection successful!");
+      return;
+    }
+    
+    Serial.println("STA mode: Connection failed! Falling back to AP mode...");
+    cfg.mode = "AP";  // Update cfg.mode to reflect actual mode
   }
 
+  Serial.printf("Starting AP mode with SSID: %s\n", cfg.ssid.c_str());
   WiFi.mode(WIFI_AP);
   WiFi.softAP(cfg.ssid.c_str(), cfg.pass.c_str());
 }

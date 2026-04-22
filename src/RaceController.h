@@ -12,6 +12,7 @@ public:
 
   bool isRunning();
   bool isSequence();
+  int getStep();
 
   unsigned long getRemaining();
 

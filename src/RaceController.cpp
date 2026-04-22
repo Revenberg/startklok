@@ -14,15 +14,25 @@ void RaceController::startSequence() {
 void RaceController::cancel() {
   running = false;
   sequence = false;
+  seqStep = 0;
 }
 
 bool RaceController::isRunning() { return running; }
 bool RaceController::isSequence() { return sequence; }
+int RaceController::getStep() { return seqStep; }
 
 unsigned long RaceController::getRemaining() {
-  if (!running) return 0;
-  unsigned long elapsed = millis() - startTime;
-  return (elapsed >= 300000) ? 0 : 300000 - elapsed;
+  if (sequence) {
+    // During countdown sequence, return time remaining until start
+    unsigned long elapsed = millis() - seqStart;
+    return (elapsed >= 300000) ? 0 : 300000 - elapsed;
+  }
+  if (running) {
+    // During race, return time remaining
+    unsigned long elapsed = millis() - startTime;
+    return (elapsed >= 300000) ? 0 : 300000 - elapsed;
+  }
+  return 0;
 }
 
 void RaceController::startRace() {
@@ -49,6 +59,7 @@ void RaceController::stepSequence() {
   }
 
   if (seqStep == 3 && t >= 300000) {
+    seqStep++;
     sequence = false;
     startRace();
   }
