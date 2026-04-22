@@ -30,25 +30,38 @@ const unsigned long BROADCAST_INTERVAL = 500; // ms - broadcast state every 500m
 
 // ================= HORN =================
 const int HORN = 18;
+unsigned long hornStartTime = 0;
+int hornDuration = 0;
+bool hornActive = false;
 
 // ================= FILE UPLOAD =================
 File uploadFile;
 
-// ================= HORN =================
-void horn(int ms) {
-  relaySet(1, 1); // Relay 1 ON
-  Serial.println("\n========== HORN ACTIVATED ==========");
-  Serial.printf("[HORN] Duration: %d ms\n", ms);
-  Serial.printf("[HORN] Pin %d: Setting LOW (active)\n", HORN);
-  digitalWrite(HORN, LOW);
-  Serial.printf("[HORN] Waiting %d ms...\n", ms);
-  delay(ms);
-  Serial.printf("[HORN] Pin %d: Setting HIGH (inactive)\n", HORN);
-  digitalWrite(HORN, HIGH);
-  relaySet(1, 0); // Relay 1 OFF
-  Serial.println("[HORN] Horn deactivated");
-  Serial.println("[HORN] Relay 1 turned OFF");
-  Serial.println("===================================\n");
+// ================= HORN (NON-BLOCKING) =================
+void hornStart(int ms) {
+  if (!hornActive) {
+    hornActive = true;
+    hornDuration = ms;
+    hornStartTime = millis();
+    
+    relaySet(1, 1); // Relay 1 ON
+    Serial.println("\n========== HORN ACTIVATED ==========");
+    Serial.printf("[HORN] Duration: %d ms\n", ms);
+    Serial.printf("[HORN] Pin %d: Setting LOW (active)\n", HORN);
+    digitalWrite(HORN, LOW);
+  }
+}
+
+void hornUpdate() {
+  if (hornActive && (millis() - hornStartTime >= hornDuration)) {
+    Serial.printf("[HORN] Pin %d: Setting HIGH (inactive)\n", HORN);
+    digitalWrite(HORN, HIGH);
+    relaySet(1, 0); // Relay 1 OFF
+    Serial.println("[HORN] Horn deactivated");
+    Serial.println("[HORN] Relay 1 turned OFF");
+    Serial.println("===================================\n");
+    hornActive = false;
+  }
 }
 
 // ================= CONTROL WRAPPERS =================
@@ -252,12 +265,22 @@ void setup() {
     }
     else if (message == "horn") {
       Serial.println("[WS] ✓ Horn command received!");
-      horn(2000);  // 2 seconden hoorn
       
-      // Add lap time if in overtime mode (elapsed > 5 minutes)
-      if (raceController.isRunning() && raceController.getElapsed() > 300000) {
+      // If during countdown sequence, restart
+      if (raceController.isSequence()) {
+        Serial.println("[HORN] During sequence - restarting countdown");
+        raceController.cancel();
+        raceController.startSequence();
+      } 
+      // If in overtime, record lap time
+      else if (raceController.isRunning() && raceController.getElapsed() > 300000) {
+        hornStart(2000);  // 2 seconden hoorn
         raceController.addLapTime();
         Serial.printf("[LAP] Lap time recorded: %lu ms\n", raceController.getElapsed());
+      }
+      // Otherwise just sound horn
+      else {
+        hornStart(2000);  // 2 seconden hoorn
       }
     }
     else {
@@ -363,6 +386,7 @@ void setup() {
 // ================= LOOP =================
 void loop() {
 
+  hornUpdate();  // Non-blocking horn timing
   webUI.update();
   server.handleClient();
 
@@ -386,28 +410,28 @@ void loop() {
       switch (currentStep) {
         case 1: // 5 minutes - Warning signal
           Serial.println("[RACE] 5 minuten - Waarschuwing signaal");
-          horn(2000); // Horn tone
+          hornStart(2000); // Horn tone
           activeRelay = 1;
           relayOnTime = millis();
           break;
           
         case 2: // 4 minutes - Preparatory signal  
           Serial.println("[RACE] 4 minuten - Voorbereidend signaal");
-          horn(2000);
+          hornStart(2000);
           activeRelay = 2;
           relayOnTime = millis();
           break;
           
         case 3: // 1 minute - One minute signal
           Serial.println("[RACE] 1 minuut - Een minuut signaal");
-          horn(2000);
+          hornStart(2000);
           activeRelay = 3;
           relayOnTime = millis();
           break;
           
         case 4: // START!
           Serial.println("[RACE] START! Race begint nu!");
-          horn(2000); // Horn blast
+          hornStart(2000); // Horn blast
           activeRelay = 4;
           relayOnTime = millis();
           break;
