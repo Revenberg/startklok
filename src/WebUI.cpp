@@ -32,7 +32,7 @@ void WebUI::setMessageHandler(WebSocketMessageHandler handler) {
   messageHandler = handler;
 }
 
-void WebUI::broadcastState(bool running, bool sequence, unsigned long remaining, unsigned long elapsed, RTC_DS3231* rtc) {
+void WebUI::broadcastState(bool running, bool sequence, unsigned long remaining, unsigned long elapsed, RTC_DS3231* rtc, std::vector<unsigned long> lapTimes) {
 
   String json = "{";
   json += "\"running\":" + String(running);
@@ -55,6 +55,14 @@ void WebUI::broadcastState(bool running, bool sequence, unsigned long remaining,
   } else {
     json += ",\"rtcFound\":false";
   }
+  
+  // Lap times
+  json += ",\"lapTimes\":[";
+  for (size_t i = 0; i < lapTimes.size(); i++) {
+    if (i > 0) json += ",";
+    json += String(lapTimes[i]);
+  }
+  json += "]";
   
   // Vlaggen op specifieke momenten tijdens sequence
   if (sequence && remaining > 0) {

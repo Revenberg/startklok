@@ -375,6 +375,46 @@ button:disabled {
   background: #00ffaa;
 }
 
+/* Lap Times Table */
+.lap-times-card {
+  margin-top: 25px;
+  display: none; /* Hidden by default, shown when lap times exist */
+}
+
+.lap-times-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 15px;
+}
+
+.lap-times-table th,
+.lap-times-table td {
+  padding: 12px;
+  text-align: left;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.lap-times-table th {
+  background: rgba(0, 255, 136, 0.1);
+  color: #00ff88;
+  font-weight: 600;
+}
+
+.lap-times-table tr:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.lap-times-table td:nth-child(1) {
+  color: #00ff88;
+  font-weight: 600;
+  width: 60px;
+}
+
+.lap-times-table td:nth-child(2) {
+  color: #ffaa00;
+  font-variant-numeric: tabular-nums;
+}
+
 @media (max-width: 600px) {
   h1 { font-size: 32px; }
   #timer { font-size: 72px; }
@@ -415,6 +455,22 @@ button:disabled {
     <button id="startBtn" onclick="startRace()">▶ Start</button>
     <button id="cancelBtn" onclick="cancelRace()">■ Cancel</button>
     <button id="hornBtn" onclick="soundHorn()">📣 Hoorn</button>
+  </div>
+
+  <div class="card lap-times-card" id="lapTimesCard">
+    <h2>⏱️ Tussentijden</h2>
+    <p style="color: #aaa; margin-bottom: 15px;">Druk op de hoorn tijdens overtime om een tussentijd vast te leggen</p>
+    <table class="lap-times-table" id="lapTimesTable">
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>Tijd</th>
+        </tr>
+      </thead>
+      <tbody id="lapTimesBody">
+        <!-- Lap times loaded here -->
+      </tbody>
+    </table>
   </div>
 
   <div class="card schedule-card">
@@ -541,6 +597,14 @@ function updateDisplay(data) {
     }
   }
   
+  // Update lap times
+  if (data.lapTimes && data.lapTimes.length > 0) {
+    document.getElementById('lapTimesCard').style.display = 'block';
+    updateLapTimes(data.lapTimes);
+  } else {
+    document.getElementById('lapTimesCard').style.display = 'none';
+  }
+  
   // Update flag display
   console.log("🚩 Updating flag to:", data.flag);
   updateFlag(data.flag);
@@ -552,6 +616,35 @@ function updateDisplay(data) {
   } else {
     startBtn.disabled = false;
   }
+}
+
+// ================= LAP TIMES DISPLAY =================
+function updateLapTimes(lapTimes) {
+  const tbody = document.getElementById('lapTimesBody');
+  tbody.innerHTML = ''; // Clear existing rows
+  
+  lapTimes.forEach((lapTimeMs, index) => {
+    const row = document.createElement('tr');
+    
+    // Lap number
+    const cellNum = document.createElement('td');
+    cellNum.textContent = (index + 1);
+    row.appendChild(cellNum);
+    
+    // Lap time formatted as +MM:SS
+    const COUNTDOWN_DURATION = 300000; // 5 minutes
+    const overtimeMs = lapTimeMs - COUNTDOWN_DURATION;
+    const sec = Math.floor(overtimeMs / 1000);
+    const m = Math.floor(sec / 60);
+    const s = sec % 60;
+    const timeStr = "+" + m + ":" + (s < 10 ? "0" : "") + s;
+    
+    const cellTime = document.createElement('td');
+    cellTime.textContent = timeStr;
+    row.appendChild(cellTime);
+    
+    tbody.appendChild(row);
+  });
 }
 
 // ================= FLAG DISPLAY =================

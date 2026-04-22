@@ -253,6 +253,12 @@ void setup() {
     else if (message == "horn") {
       Serial.println("[WS] ✓ Horn command received!");
       horn(2000);  // 2 seconden hoorn
+      
+      // Add lap time if in overtime mode (elapsed > 5 minutes)
+      if (raceController.isRunning() && raceController.getElapsed() > 300000) {
+        raceController.addLapTime();
+        Serial.printf("[LAP] Lap time recorded: %lu ms\n", raceController.getElapsed());
+      }
     }
     else {
       Serial.printf("[WS] Unknown command: '%s'\n", message.c_str());
@@ -452,7 +458,8 @@ void loop() {
       raceController.isSequence(),
       raceController.getRemaining(),
       raceController.getElapsed(),
-      &rtc
+      &rtc,
+      raceController.getLapTimes()
     );
   }
 }

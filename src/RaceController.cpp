@@ -15,6 +15,7 @@ void RaceController::cancel() {
   running = false;
   sequence = false;
   seqStep = 0;
+  lapTimes.clear();
 }
 
 bool RaceController::isRunning() { return running; }
@@ -78,4 +79,20 @@ void RaceController::stepSequence() {
 void RaceController::update() {
   stepSequence();
   // Race blijft lopen, geen auto-stop meer
+}
+
+// Lap time tracking
+void RaceController::addLapTime() {
+  if (running) {
+    unsigned long elapsed = getElapsed();
+    lapTimes.push_back(elapsed);
+  }
+}
+
+void RaceController::clearLapTimes() {
+  lapTimes.clear();
+}
+
+std::vector<unsigned long> RaceController::getLapTimes() {
+  return lapTimes;
 }

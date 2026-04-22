@@ -1,5 +1,6 @@
 #pragma once
 #include <Arduino.h>
+#include <vector>
 
 class RaceController {
 
@@ -16,6 +17,11 @@ public:
 
   unsigned long getRemaining();
   unsigned long getElapsed();
+  
+  // Lap time tracking
+  void addLapTime();
+  void clearLapTimes();
+  std::vector<unsigned long> getLapTimes();
 
 private:
 
@@ -26,6 +32,8 @@ private:
   unsigned long seqStart = 0;
 
   int seqStep = 0;
+  
+  std::vector<unsigned long> lapTimes;
 
   void stepSequence();
   void startRace();
