@@ -130,6 +130,87 @@ mode
 arduino-cli monitor -p COM7 -c baudrate=115200
 ```
 
+## Debug & Testing
+
+### Test Dashboard (via curl)
+
+**Vervang `192.168.1.200` met het IP adres van je ESP32**
+
+```powershell
+# Test dashboard homepage
+curl http://192.168.1.200/
+
+# Test status API (JSON response)
+curl http://192.168.1.200/status
+
+# Test version endpoint
+curl http://192.168.1.200/version
+
+# Test setup page
+curl http://192.168.1.200/setup
+
+# Test relay control (relay 1 aan)
+curl "http://192.168.1.200/relay?nr=1&state=1"
+
+# Test relay control (relay 1 uit)
+curl "http://192.168.1.200/relay?nr=1&state=0"
+
+# Start race sequence
+curl http://192.168.1.200/start
+
+# Cancel race
+curl http://192.168.1.200/cancel
+```
+
+### Test in Browser
+
+Open een browser en navigeer naar:
+- **Dashboard**: `http://192.168.1.200/`
+- **Setup**: `http://192.168.1.200/setup`
+- **Status API**: `http://192.168.1.200/status`
+- **Version**: `http://192.168.1.200/version`
+
+### IP Adres Vinden
+
+Via Serial Monitor (115200 baud):
+```
+Connecting to WiFi...
+WiFi connected
+IP address: 192.168.1.200
+```
+
+Of via Arduino IDE Serial Monitor of arduino-cli:
+```powershell
+arduino-cli monitor -p COM7 -c baudrate=115200
+```
+
+### WebSocket Test
+
+WebSocket server draait op poort **81**:
+- Endpoint: `ws://192.168.1.200:81`
+- Commands: `"start"`, `"cancel"`
+
+### Quick Test Script
+
+Maak een `test.ps1` voor snelle tests:
+
+```powershell
+param([string]$IP = "192.168.1.200")
+
+Write-Host "Testing ESP32 at $IP..." -ForegroundColor Cyan
+
+Write-Host "`n1. Version:" -ForegroundColor Yellow
+curl "http://$IP/version"
+
+Write-Host "`n`n2. Status:" -ForegroundColor Yellow
+curl "http://$IP/status"
+
+Write-Host "`n`n3. Dashboard available at:" -ForegroundColor Green
+Write-Host "http://$IP/" -ForegroundColor White
+```
+
+Gebruik: `.\test.ps1 -IP 192.168.1.200`
+
 ## Board Specifieke Settings
 
 Voor ESP32 Dev Module:

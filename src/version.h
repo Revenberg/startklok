@@ -10,4 +10,3 @@
 
 // Version string
 #define VERSION_STRING "v1.0.0-b2"
-
