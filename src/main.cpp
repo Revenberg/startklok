@@ -35,9 +35,11 @@ File uploadFile;
 
 // ================= HORN =================
 void horn(int ms) {
+  Serial.printf("[HORN] Activating horn for %d ms\n", ms);
   digitalWrite(HORN, LOW);
   delay(ms);
   digitalWrite(HORN, HIGH);
+  Serial.println("[HORN] Horn deactivated");
 }
 
 // ================= CONTROL WRAPPERS =================
@@ -229,6 +231,10 @@ void setup() {
     else if (message == "cancel") {
       Serial.println("[WS] Canceling race");
       cancelRace();
+    }
+    else if (message == "horn") {
+      Serial.println("[WS] Sounding horn");
+      horn(2000);  // 2 seconden hoorn
     }
     else {
       Serial.printf("[WS] Unknown command: %s\n", message.c_str());

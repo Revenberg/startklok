@@ -235,6 +235,15 @@ button:active {
   background: linear-gradient(135deg, #ff5555 0%, #dd1111 100%);
 }
 
+#hornBtn {
+  background: linear-gradient(135deg, #ffaa00 0%, #ff8800 100%);
+  color: #000;
+}
+
+#hornBtn:hover {
+  background: linear-gradient(135deg, #ffbb11 0%, #ff9911 100%);
+}
+
 button:disabled {
   opacity: 0.5;
   cursor: not-allowed;
@@ -394,6 +403,7 @@ button:disabled {
   <div class="controls">
     <button id="startBtn" onclick="startRace()">▶ Start</button>
     <button id="cancelBtn" onclick="cancelRace()">■ Cancel</button>
+    <button id="hornBtn" onclick="soundHorn()">📣 Hoorn</button>
   </div>
 
   <div class="card schedule-card">
@@ -561,6 +571,17 @@ function cancelRace() {
   }
 }
 
+function soundHorn() {
+  console.log("[HORN] Button clicked");
+  if (ws && ws.readyState === WebSocket.OPEN) {
+    console.log("[HORN] Sending horn command via WebSocket");
+    ws.send("horn");
+  } else {
+    console.error("[HORN] WebSocket not connected!", ws ? ws.readyState : "no ws");
+    alert('WebSocket niet verbonden!');
+  }
+}
+
 // ================= CLOCK =================
 function updateClock() {
   const now = new Date();
@@ -608,6 +629,8 @@ function addScheduleTime() {
   const input = document.getElementById('newTime');
   const time = input.value;
   
+  console.log("[SCHEDULE] Adding time:", time);
+  
   if (!time) {
     alert('Voer een tijd in');
     return;
@@ -619,23 +642,34 @@ function addScheduleTime() {
     body: 'time=' + encodeURIComponent(time)
   })
   .then(r => {
+    console.log("[SCHEDULE] Response status:", r.status);
     if (r.ok) {
-      input.value = '';
-      loadSchedule();
+      return r.json();
     } else {
-      alert('Fout bij toevoegen tijd');
+      return r.text().then(text => {
+        throw new Error('Server error: ' + text);
+      });
     }
   })
-  .catch(err => console.error("Add time error:", err));
+  .then(data => {
+    console.log("[SCHEDULE] Response data:", data);
+    input.value = '';
+    loadSchedule();
+  })
+  .catch(err => {
+    console.error("[SCHEDULE] Add time error:", err);
+    alert('Fout bij toevoegen tijd: ' + err.message);
+  });
 }
 
 function deleteScheduleTime(index) {
-  if (!confirm('Deze tijd verwijderen?')) return;
+  console.log("[SCHEDULE] Deleting time index:", index);
   
   fetch('/schedule?index=' + index, {
     method: 'DELETE'
   })
   .then(r => {
+    console.log("[SCHEDULE] Delete response status:", r.status);
     if (r.ok) {
       loadSchedule();
     } else {
