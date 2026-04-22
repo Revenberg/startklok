@@ -147,6 +147,12 @@ void setup() {
   Serial.println("Initializing LittleFS...");
   LittleFS.begin(true);
 
+  Serial.println("Loading WiFi configuration...");
+  loadConfig();
+  
+  Serial.println("Starting WiFi...");
+  startWiFi();
+
   Serial.println("Initializing hardware...");
   relayInit();
   lcdInit();
