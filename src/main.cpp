@@ -349,43 +349,49 @@ void loop() {
   
   int currentStep = raceController.getStep();
   
-  // Trigger signals when step changes
-  if (raceController.isSequence() && currentStep != lastStep) {
-    lastStep = currentStep;
+  // Trigger signals when step changes (including step 4 for race start)
+  if (currentStep != lastStep && currentStep > 0) {
+    // Check if sequence is active OR if this is the start signal (step 4)
+    bool isSequenceActive = raceController.isSequence();
+    bool isRaceStart = (currentStep == 4 && !isSequenceActive && raceController.isRunning());
     
-    // Trigger signals based on step
-    switch (currentStep) {
-      case 1: // 5 minutes - Warning signal
-        Serial.println("[RACE] 5 minuten - Waarschuwing signaal");
-        relaySet(1, 1); // Relay 1 ON
-        horn(500); // Horn tone
-        activeRelay = 1;
-        relayOnTime = millis();
-        break;
-        
-      case 2: // 4 minutes - Preparatory signal  
-        Serial.println("[RACE] 4 minuten - Voorbereidend signaal");
-        relaySet(2, 1); // Relay 2 ON
-        horn(500);
-        activeRelay = 2;
-        relayOnTime = millis();
-        break;
-        
-      case 3: // 1 minute - One minute signal
-        Serial.println("[RACE] 1 minuut - Een minuut signaal");
-        relaySet(3, 1); // Relay 3 ON
-        horn(500);
-        activeRelay = 3;
-        relayOnTime = millis();
-        break;
-        
-      case 4: // START!
-        Serial.println("[RACE] START!");
-        relaySet(4, 1); // Relay 4 ON
-        horn(1000); // Long horn blast
-        activeRelay = 4;
-        relayOnTime = millis();
-        break;
+    if (isSequenceActive || isRaceStart) {
+      lastStep = currentStep;
+      
+      // Trigger signals based on step
+      switch (currentStep) {
+        case 1: // 5 minutes - Warning signal
+          Serial.println("[RACE] 5 minuten - Waarschuwing signaal");
+          relaySet(1, 1); // Relay 1 ON
+          horn(500); // Horn tone
+          activeRelay = 1;
+          relayOnTime = millis();
+          break;
+          
+        case 2: // 4 minutes - Preparatory signal  
+          Serial.println("[RACE] 4 minuten - Voorbereidend signaal");
+          relaySet(2, 1); // Relay 2 ON
+          horn(500);
+          activeRelay = 2;
+          relayOnTime = millis();
+          break;
+          
+        case 3: // 1 minute - One minute signal
+          Serial.println("[RACE] 1 minuut - Een minuut signaal");
+          relaySet(3, 1); // Relay 3 ON
+          horn(500);
+          activeRelay = 3;
+          relayOnTime = millis();
+          break;
+          
+        case 4: // START!
+          Serial.println("[RACE] START! Race begint nu!");
+          relaySet(4, 1); // Relay 4 ON
+          horn(1000); // Long horn blast
+          activeRelay = 4;
+          relayOnTime = millis();
+          break;
+      }
     }
   }
   
@@ -396,8 +402,8 @@ void loop() {
     activeRelay = 0;
   }
   
-  // Reset when sequence is cancelled
-  if (!raceController.isSequence() && lastStep != -1) {
+  // Reset when sequence is cancelled (but not if race just started)
+  if (!raceController.isSequence() && !raceController.isRunning() && lastStep != -1) {
     lastStep = -1;
     activeRelay = 0;
     relayReset(); // Turn off all relays
