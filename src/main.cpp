@@ -50,14 +50,16 @@ void cancelRace() {
 
 // ================= ROOT =================
 void handleRoot() {
-
+  Serial.println("[HTTP] GET / - Serving index.html");
+  
   if (LittleFS.exists("/index.html")) {
-
     File f = LittleFS.open("/index.html", "r");
+    Serial.printf("[HTTP] File size: %d bytes\n", f.size());
     server.streamFile(f, "text/html");
     f.close();
-
+    Serial.println("[HTTP] index.html sent successfully");
   } else {
+    Serial.println("[HTTP] ERROR: index.html missing!");
     server.send(404, "text/plain", "index.html missing");
   }
 }
