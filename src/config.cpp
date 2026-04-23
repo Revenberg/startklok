@@ -384,6 +384,15 @@ void registerConfigRoutes(WebServer &server) {
       return;
     }
     
+    // Extract filename without path for Content-Disposition
+    String displayName = filename;
+    if (displayName.startsWith("/")) {
+      displayName = displayName.substring(1);
+    }
+    
+    // Set Content-Disposition header to preserve filename
+    server.sendHeader("Content-Disposition", "attachment; filename=\"" + displayName + "\"");
+    
     File f = LittleFS.open(filename, "r");
     server.streamFile(f, "application/octet-stream");
     f.close();
