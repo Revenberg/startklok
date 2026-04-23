@@ -34,6 +34,22 @@ unsigned long hornStartTime = 0;
 int hornDuration = 0;
 bool hornActive = false;
 
+// Horn pattern sequence (for "end" signal)
+struct HornPattern {
+  int duration;
+  bool on;
+};
+HornPattern endPattern[] = {
+  {1000, true},   // 1 sec ON
+  {1000, false},  // 1 sec OFF
+  {1000, true},   // 1 sec ON
+  {1000, false},  // 1 sec OFF
+  {2000, true}    // 2 sec ON
+};
+int endPatternLength = 5;
+int endPatternStep = -1;
+unsigned long endPatternStartTime = 0;
+
 // ================= FILE UPLOAD =================
 File uploadFile;
 
@@ -53,6 +69,40 @@ void hornStart(int ms) {
 }
 
 void hornUpdate() {
+  // Handle end pattern sequence
+  if (endPatternStep >= 0) {
+    unsigned long elapsed = millis() - endPatternStartTime;
+    
+    if (elapsed >= endPattern[endPatternStep].duration) {
+      // Current step complete, move to next
+      endPatternStep++;
+      
+      if (endPatternStep >= endPatternLength) {
+        // Pattern complete
+        Serial.println("[HORN] End pattern complete");
+        digitalWrite(HORN, HIGH);
+        relaySet(1, 0);
+        endPatternStep = -1;
+      } else {
+        // Start next step
+        endPatternStartTime = millis();
+        if (endPattern[endPatternStep].on) {
+          digitalWrite(HORN, LOW);
+          relaySet(1, 1);
+          Serial.printf("[HORN] End pattern step %d: ON (%dms)\n", 
+                       endPatternStep, endPattern[endPatternStep].duration);
+        } else {
+          digitalWrite(HORN, HIGH);
+          relaySet(1, 0);
+          Serial.printf("[HORN] End pattern step %d: OFF (%dms)\n", 
+                       endPatternStep, endPattern[endPatternStep].duration);
+        }
+      }
+    }
+    return;  // Don't process normal horn when pattern is active
+  }
+  
+  // Handle normal horn
   if (hornActive && (millis() - hornStartTime >= hornDuration)) {
     Serial.printf("[HORN] Pin %d: Setting HIGH (inactive)\n", HORN);
     digitalWrite(HORN, HIGH);
@@ -64,9 +114,24 @@ void hornUpdate() {
   }
 }
 
+void hornStartEndPattern() {
+  if (endPatternStep < 0 && !hornActive) {
+    Serial.println("\n========== END SIGNAL PATTERN ==========");
+    endPatternStep = 0;
+    endPatternStartTime = millis();
+    digitalWrite(HORN, LOW);
+    relaySet(1, 1);
+    Serial.println("[HORN] Starting end pattern: 1s ON, 1s OFF, 1s ON, 1s OFF, 2s ON");
+  }
+}
+
 // ================= CONTROL WRAPPERS =================
 void startSequence() {
   raceController.startSequence();
+}
+
+void startShortSequence() {
+  raceController.startShortSequence();
 }
 
 void cancelRace() {
@@ -259,9 +324,17 @@ void setup() {
       Serial.println("[WS] Starting race sequence");
       startSequence();
     }
+    else if (message == "startShort") {
+      Serial.println("[WS] Starting SHORT race sequence (3 min)");
+      startShortSequence();
+    }
     else if (message == "cancel") {
       Serial.println("[WS] Canceling race");
       cancelRace();
+    }
+    else if (message == "end") {
+      Serial.println("[WS] ✓ End signal command received!");
+      hornStartEndPattern();
     }
     else if (message == "horn") {
       Serial.println("[WS] ✓ Horn command received!");

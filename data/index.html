@@ -452,9 +452,11 @@ button:disabled {
   </div>
 
   <div class="controls">
-    <button id="startBtn" onclick="startRace()">▶ Start</button>
+    <button id="startBtn" onclick="startRace()">▶ Start (5 min)</button>
+    <button id="startShortBtn" onclick="startShortRace()">▶ Start (3 min)</button>
     <button id="cancelBtn" onclick="cancelRace()">■ Cancel</button>
     <button id="hornBtn" onclick="soundHorn()">📣 Hoorn</button>
+    <button id="endBtn" onclick="endSignal()">🏁 Einde</button>
   </div>
 
   <div class="card lap-times-card" id="lapTimesCard">
@@ -609,12 +611,19 @@ function updateDisplay(data) {
   console.log("🚩 Updating flag to:", data.flag);
   updateFlag(data.flag);
   
-  // Disable start button during countdown or race
+  // Disable/enable buttons based on state
   const startBtn = document.getElementById('startBtn');
+  const startShortBtn = document.getElementById('startShortBtn');
+  const endBtn = document.getElementById('endBtn');
+  
   if (data.sequence || data.running) {
     startBtn.disabled = true;
+    startShortBtn.disabled = true;
+    endBtn.disabled = true;
   } else {
     startBtn.disabled = false;
+    startShortBtn.disabled = false;
+    endBtn.disabled = false;
   }
 }
 
@@ -699,6 +708,23 @@ function soundHorn() {
     ws.send("horn");
   } else {
     console.error("[HORN] WebSocket not connected!", ws ? ws.readyState : "no ws");
+    alert('WebSocket niet verbonden!');
+  }
+}
+
+function startShortRace() {
+  if (ws && ws.readyState === WebSocket.OPEN) {
+    ws.send("startShort");
+  }
+}
+
+function endSignal() {
+  console.log("[END] Button clicked");
+  if (ws && ws.readyState === WebSocket.OPEN) {
+    console.log("[END] Sending end command via WebSocket");
+    ws.send("end");
+  } else {
+    console.error("[END] WebSocket not connected!");
     alert('WebSocket niet verbonden!');
   }
 }

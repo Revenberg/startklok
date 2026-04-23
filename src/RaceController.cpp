@@ -7,6 +7,14 @@ void RaceController::begin() {
 
 void RaceController::startSequence() {
   sequence = true;
+  shortSequence = false;
+  seqStep = 0;
+  seqStart = millis();
+}
+
+void RaceController::startShortSequence() {
+  sequence = true;
+  shortSequence = true;
   seqStep = 0;
   seqStart = millis();
 }
@@ -14,22 +22,26 @@ void RaceController::startSequence() {
 void RaceController::cancel() {
   running = false;
   sequence = false;
+  shortSequence = false;
   seqStep = 0;
   lapTimes.clear();
 }
 
 bool RaceController::isRunning() { return running; }
 bool RaceController::isSequence() { return sequence; }
+bool RaceController::isShortSequence() { return shortSequence; }
 int RaceController::getStep() { return seqStep; }
 
 unsigned long RaceController::getRemaining() {
+  unsigned long duration = shortSequence ? 180000 : 300000; // 3 min or 5 min
+  
   if (sequence) {
     // During countdown sequence, return time remaining until start
     unsigned long elapsed = millis() - seqStart;
-    return (elapsed >= 300000) ? 0 : 300000 - elapsed;
+    return (elapsed >= duration) ? 0 : duration - elapsed;
   }
   if (running) {
-    // During race, return time remaining
+    // During race, return time remaining (always 5 minutes for race)
     unsigned long elapsed = millis() - startTime;
     return (elapsed >= 300000) ? 0 : 300000 - elapsed;
   }
@@ -54,25 +66,41 @@ void RaceController::stepSequence() {
 
   unsigned long t = millis() - seqStart;
 
-  if (seqStep == 0 && t >= 0) {
-    seqStep++;
-  }
-
-  if (seqStep == 1 && t >= 60000) {
-    seqStep++;
-  }
-
-  if (seqStep == 2 && t >= 240000) {
-    seqStep++;
-  }
-
-  if (seqStep == 3 && t >= 300000) {
-    seqStep++;
-    sequence = false;
-    // Start race with elapsed time already at 5 minutes (300000ms)
-    // so overtime counting continues from +0:00
-    running = true;
-    startTime = seqStart;  // Use sequence start time, not current time
+  if (shortSequence) {
+    // Short sequence: 3 min countdown (signals at 3, 2, 1, 0)
+    if (seqStep == 0 && t >= 0) {
+      seqStep++;
+    }
+    if (seqStep == 1 && t >= 60000) {  // 2 min mark
+      seqStep++;
+    }
+    if (seqStep == 2 && t >= 120000) {  // 1 min mark
+      seqStep++;
+    }
+    if (seqStep == 3 && t >= 180000) {  // START (0 min)
+      seqStep++;
+      sequence = false;
+      shortSequence = false;
+      running = true;
+      startTime = seqStart;
+    }
+  } else {
+    // Normal sequence: 5 min countdown (signals at 5, 4, 1, 0)
+    if (seqStep == 0 && t >= 0) {
+      seqStep++;
+    }
+    if (seqStep == 1 && t >= 60000) {  // 4 min mark
+      seqStep++;
+    }
+    if (seqStep == 2 && t >= 240000) {  // 1 min mark
+      seqStep++;
+    }
+    if (seqStep == 3 && t >= 300000) {  // START (0 min)
+      seqStep++;
+      sequence = false;
+      running = true;
+      startTime = seqStart;
+    }
   }
 }
 
