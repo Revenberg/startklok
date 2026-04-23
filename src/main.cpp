@@ -13,6 +13,7 @@
 #include "WebUI.h"
 #include "version.h"
 #include "schedule.h"
+#include "telegram.h"
 #include <RTClib.h>
 
 // ================= CONTROLLER INSTANCES =================
@@ -279,6 +280,9 @@ void setup() {
   Serial.println("Loading schedule...");
   schedule.begin();
   
+  Serial.println("Initializing Telegram...");
+  telegram.begin();
+  
   // Configure NTP for time synchronization and sync to RTC
   Serial.println("Configuring NTP...");
   configTime(3600, 3600, "pool.ntp.org", "time.nist.gov");
@@ -339,6 +343,10 @@ void setup() {
     else if (message == "horn") {
       Serial.println("[WS] ✓ Horn command received!");
       
+      // Send Telegram notification
+      telegram.sendRaceStatus(raceController.isRunning(), raceController.isSequence(), 
+                             raceController.getRemaining(), raceController.getElapsed());
+      
       // If during countdown sequence, restart
       if (raceController.isSequence()) {
         Serial.println("[HORN] During sequence - restarting countdown");
@@ -350,6 +358,14 @@ void setup() {
         hornStart(2000);  // 2 seconden hoorn
         raceController.addLapTime();
         Serial.printf("[LAP] Lap time recorded: %lu ms\n", raceController.getElapsed());
+        
+        // Send lap time notification
+        unsigned long overtimeMs = raceController.getElapsed() - 300000;
+        int sec = overtimeMs / 1000;
+        int m = sec / 60;
+        int s = sec % 60;
+        String lapMsg = "⏱️ Lap time: +" + String(m) + ":" + (s < 10 ? "0" : "") + String(s);
+        telegram.sendMessage(lapMsg);
       }
       // Otherwise just sound horn
       else {
