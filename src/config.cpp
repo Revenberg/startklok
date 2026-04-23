@@ -374,6 +374,11 @@ void registerConfigRoutes(WebServer &server) {
   server.on("/files/download", [&server]() {
     String filename = server.arg("name");
     
+    // Ensure filename starts with /
+    if (!filename.startsWith("/")) {
+      filename = "/" + filename;
+    }
+    
     if (!LittleFS.exists(filename)) {
       server.send(404, "text/plain", "File not found");
       return;
@@ -387,6 +392,11 @@ void registerConfigRoutes(WebServer &server) {
   // Delete file
   server.on("/files/delete", HTTP_POST, [&server]() {
     String filename = server.arg("name");
+    
+    // Ensure filename starts with /
+    if (!filename.startsWith("/")) {
+      filename = "/" + filename;
+    }
     
     if (LittleFS.remove(filename)) {
       server.send(200, "text/plain", "File deleted");
