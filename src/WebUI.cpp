@@ -14,7 +14,7 @@ static void webSocketEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t
       Serial.printf("[WS] Client #%u sent: %s\n", num, payload);
       if (WebUI::messageHandler != nullptr) {
         String msg = String((char*)payload);
-        WebUI::messageHandler(msg);
+        WebUI::messageHandler(num, msg);
       }
       break;
     default:
@@ -30,6 +30,10 @@ void WebUI::begin() {
 
 void WebUI::setMessageHandler(WebSocketMessageHandler handler) {
   messageHandler = handler;
+}
+
+void WebUI::sendToClient(uint8_t num, String message) {
+  ws.sendTXT(num, message);
 }
 
 void WebUI::broadcastState(bool running, bool sequence, unsigned long remaining, unsigned long elapsed, RTC_DS3231* rtc, std::vector<unsigned long> lapTimes) {

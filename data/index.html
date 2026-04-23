@@ -475,6 +475,20 @@ button:disabled {
     </table>
   </div>
 
+  <div class="card telegram-card">
+    <h2>📱 Telegram Bericht</h2>
+    <p style="color: #aaa; margin-bottom: 15px;">Stuur een bericht naar de geconfigureerde Telegram chat</p>
+    
+    <div style="display: flex; gap: 10px; margin-top: 20px;">
+      <input type="text" id="telegramMessage" placeholder="Type hier je bericht..." 
+             style="flex: 1; padding: 12px; border-radius: 8px; border: 1px solid #444; background: #222; color: white; font-size: 16px;">
+      <button onclick="sendTelegramMessage()" 
+              style="padding: 12px 24px; border-radius: 8px; border: none; background: linear-gradient(135deg, #0088cc 0%, #0066aa 100%); color: white; font-size: 16px; cursor: pointer; font-weight: bold;">
+        📤 Verstuur
+      </button>
+    </div>
+  </div>
+
   <div class="card schedule-card">
     <h2>📅 Schema Start Tijden</h2>
     <p style="color: #aaa; margin-bottom: 15px;">Races starten automatisch 5 minuten voor geplande tijd</p>
@@ -528,6 +542,13 @@ function connectWebSocket() {
   
   ws.onmessage = (e) => {
     try {
+      // Check if message is a telegram response
+      if (e.data.startsWith("telegram:")) {
+        handleTelegramResponse(e.data);
+        return;
+      }
+      
+      // Otherwise parse as JSON
       const data = JSON.parse(e.data);
       updateDisplay(data);
     } catch (err) {
@@ -725,6 +746,59 @@ function endSignal() {
     ws.send("end");
   } else {
     console.error("[END] WebSocket not connected!");
+    alert('WebSocket niet verbonden!');
+  }
+}
+
+function handleTelegramResponse(message) {
+  const input = document.getElementById("telegramMessage");
+  
+  if (message === "telegram:ok") {
+    console.log("[TELEGRAM] ✓ Message sent successfully");
+    
+    // Success feedback
+    input.style.borderColor = '#00ff88';
+    input.placeholder = 'Bericht verzonden! ✓';
+    
+    setTimeout(() => {
+      input.style.borderColor = '#444';
+      input.placeholder = 'Type hier je bericht...';
+    }, 2000);
+  } else if (message === "telegram:error") {
+    console.error("[TELEGRAM] ✗ Failed to send message");
+    
+    // Error feedback
+    input.style.borderColor = '#ff4444';
+    input.placeholder = 'Verzenden mislukt! Controleer Telegram config.';
+    
+    setTimeout(() => {
+      input.style.borderColor = '#444';
+      input.placeholder = 'Type hier je bericht...';
+    }, 3000);
+    
+    alert('❌ Telegram bericht kon niet worden verzonden!\n\nMogelijke oorzaken:\n- Telegram niet geconfigureerd (/telegram)\n- WiFi verbinding verloren\n- Ongeldige bot token of chat ID');
+  }
+}
+
+function sendTelegramMessage() {
+  const input = document.getElementById("telegramMessage");
+  const message = input.value.trim();
+  
+  if (!message) {
+    alert('Voer een bericht in!');
+    return;
+  }
+  
+  if (ws && ws.readyState === WebSocket.OPEN) {
+    console.log("[TELEGRAM] Sending message:", message);
+    ws.send("telegram:" + message);
+    input.value = ''; // Clear input
+    
+    // Waiting feedback
+    input.style.borderColor = '#ffaa00';
+    input.placeholder = 'Bezig met verzenden...';
+  } else {
+    console.error("[TELEGRAM] WebSocket not connected!");
     alert('WebSocket niet verbonden!');
   }
 }

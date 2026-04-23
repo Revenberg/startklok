@@ -21,27 +21,30 @@ void TelegramHelper::begin() {
   }
 }
 
-void TelegramHelper::sendMessage(String message) {
+bool TelegramHelper::sendMessage(String message) {
   if (!configured || !bot) {
     Serial.println("[Telegram] Not configured, cannot send message");
-    return;
+    return false;
   }
   
   if (WiFi.status() != WL_CONNECTED) {
     Serial.println("[Telegram] WiFi not connected");
-    return;
+    return false;
   }
   
   Serial.printf("[Telegram] Sending: %s\n", message.c_str());
   
-  if (bot->sendMessage(chatId, message, "")) {
+  bool success = bot->sendMessage(chatId, message, "");
+  if (success) {
     Serial.println("[Telegram] ✓ Message sent");
   } else {
     Serial.println("[Telegram] ✗ Failed to send message");
   }
+  
+  return success;
 }
 
-void TelegramHelper::sendRaceStatus(bool running, bool sequence, unsigned long remaining, unsigned long elapsed) {
+bool TelegramHelper::sendRaceStatus(bool running, bool sequence, unsigned long remaining, unsigned long elapsed) {
   String status = "🏁 Race Status\n\n";
   
   if (sequence) {
@@ -69,7 +72,7 @@ void TelegramHelper::sendRaceStatus(bool running, bool sequence, unsigned long r
     status += "✅ READY";
   }
   
-  sendMessage(status);
+  return sendMessage(status);
 }
 
 bool TelegramHelper::isConfigured() {

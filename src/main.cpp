@@ -318,7 +318,7 @@ void setup() {
   webUI.begin();
   
   // Set WebSocket message handler
-  webUI.setMessageHandler([](String message) {
+  webUI.setMessageHandler([](uint8_t num, String message) {
     // Trim whitespace from message
     message.trim();
     
@@ -371,6 +371,16 @@ void setup() {
       else {
         hornStart(2000);  // 2 seconden hoorn
       }
+    }
+    else if (message.startsWith("telegram:")) {
+      String userMsg = message.substring(9);
+      Serial.printf("[WS] Telegram message request: %s\n", userMsg.c_str());
+      
+      bool success = telegram.sendMessage(userMsg);
+      
+      // Send response back to client
+      String response = success ? "telegram:ok" : "telegram:error";
+      webUI.sendToClient(num, response);
     }
     else {
       Serial.printf("[WS] Unknown command: '%s'\n", message.c_str());

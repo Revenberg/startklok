@@ -4,8 +4,8 @@
 class TelegramHelper {
 public:
   void begin();
-  void sendMessage(String message);
-  void sendRaceStatus(bool running, bool sequence, unsigned long remaining, unsigned long elapsed);
+  bool sendMessage(String message);
+  bool sendRaceStatus(bool running, bool sequence, unsigned long remaining, unsigned long elapsed);
   
   bool isConfigured();
   String getBotToken();
