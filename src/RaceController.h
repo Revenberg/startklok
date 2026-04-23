@@ -2,6 +2,14 @@
 #include <Arduino.h>
 #include <vector>
 
+// Time-driven sequence event
+struct SequenceEvent {
+  unsigned long timestamp;     // Absolute time (millis)
+  int remainingMinutes;        // Minutes remaining (for display/telegram)
+  bool hornDone;               // Horn signal completed
+  bool telegramDone;           // Telegram notification sent
+};
+
 class RaceController {
 
 public:
@@ -34,11 +42,15 @@ private:
   unsigned long startTime = 0;
   unsigned long seqStart = 0;
 
-  int seqStep = 0;
+  // Time-driven sequence schedule
+  SequenceEvent events[4];  // Max 4 events (5min: 5,4,1,0 or 3min: 3,2,1,0)
+  int eventCount = 0;
+  int currentEvent = 0;
   
   std::vector<unsigned long> lapTimes;
 
-  void stepSequence();
+  void processSequenceEvents();
+  void scheduleEvents(bool isShort);
   void startRace();
 
 };
