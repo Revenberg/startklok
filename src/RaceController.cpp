@@ -1,5 +1,8 @@
 #include "RaceController.h"
 #include "telegram.h"
+#include <RTClib.h>
+
+extern RTC_DS3231 rtc;
 
 void RaceController::begin() {
   running = false;
@@ -82,7 +85,12 @@ void RaceController::stepSequence() {
       seqStep++;
     }
    if (seqStep == 3 && t >= 180000) {  // START (0 min)
-      telegram.sendMessage("[SEQ] START!");
+      DateTime now = rtc.now();
+      char timeStr[32];
+      sprintf(timeStr, "%02d:%02d:%02d", now.hour(), now.minute(), now.second());
+      String startMsg = "🏁 RACE START!\n⏰ Start tijd: " + String(timeStr);
+      telegram.sendMessage(startMsg);
+      
       seqStep++;
       sequence = false;
       shortSequence = false;
@@ -104,7 +112,12 @@ void RaceController::stepSequence() {
       seqStep++;
     }
     if (seqStep == 3 && t >= 300000) {  // START (0 min)
-      telegram.sendMessage("[SEQ] START!");
+      DateTime now = rtc.now();
+      char timeStr[32];
+      sprintf(timeStr, "%02d:%02d:%02d", now.hour(), now.minute(), now.second());
+      String startMsg = "🏁 RACE START!\n⏰ Start tijd: " + String(timeStr);
+      telegram.sendMessage(startMsg);
+      
       seqStep++;
       sequence = false;
       running = true;
