@@ -1,4 +1,5 @@
 #include "RaceController.h"
+#include "telegram.h"
 
 void RaceController::begin() {
   running = false;
@@ -69,15 +70,19 @@ void RaceController::stepSequence() {
   if (shortSequence) {
     // Short sequence: 3 min countdown (signals at 3, 2, 1, 0)
     if (seqStep == 0 && t >= 0) {
+      telegram.sendMessage("[SEQ] 3 minutes remaining");
       seqStep++;
     }
     if (seqStep == 1 && t >= 60000) {  // 2 min mark
+      telegram.sendMessage("[SEQ] 2 minutes remaining");
       seqStep++;
     }
     if (seqStep == 2 && t >= 120000) {  // 1 min mark
+      telegram.sendMessage("[SEQ] 1 minute remaining");
       seqStep++;
     }
-    if (seqStep == 3 && t >= 180000) {  // START (0 min)
+   if (seqStep == 3 && t >= 180000) {  // START (0 min)
+      telegram.sendMessage("[SEQ] START!");
       seqStep++;
       sequence = false;
       shortSequence = false;
@@ -87,15 +92,19 @@ void RaceController::stepSequence() {
   } else {
     // Normal sequence: 5 min countdown (signals at 5, 4, 1, 0)
     if (seqStep == 0 && t >= 0) {
+    telegram.sendMessage("[SEQ] 5 minutes remaining");
       seqStep++;
     }
     if (seqStep == 1 && t >= 60000) {  // 4 min mark
+      telegram.sendMessage("[SEQ] 4 minutes remaining");
       seqStep++;
     }
     if (seqStep == 2 && t >= 240000) {  // 1 min mark
+      telegram.sendMessage("[SEQ] 1 minute remaining");
       seqStep++;
     }
     if (seqStep == 3 && t >= 300000) {  // START (0 min)
+      telegram.sendMessage("[SEQ] START!");
       seqStep++;
       sequence = false;
       running = true;

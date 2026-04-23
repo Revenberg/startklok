@@ -327,14 +327,17 @@ void setup() {
     if (message == "start") {
       Serial.println("[WS] Starting race sequence");
       startSequence();
+      telegram.sendMessage("[WS] Starting race sequence");
     }
     else if (message == "startShort") {
       Serial.println("[WS] Starting SHORT race sequence (3 min)");
       startShortSequence();
+      telegram.sendMessage("[WS] Starting SHORT race sequence (3 min)");
     }
     else if (message == "cancel") {
       Serial.println("[WS] Canceling race");
       cancelRace();
+      telegram.sendMessage("[RACE] Race canceled");
     }
     else if (message == "end") {
       Serial.println("[WS] ✓ End signal command received!");
@@ -343,14 +346,11 @@ void setup() {
     else if (message == "horn") {
       Serial.println("[WS] ✓ Horn command received!");
       
-      // Send Telegram notification
-      telegram.sendRaceStatus(raceController.isRunning(), raceController.isSequence(), 
-                             raceController.getRemaining(), raceController.getElapsed());
-      
       // If during countdown sequence, restart
       if (raceController.isSequence()) {
         Serial.println("[HORN] During sequence - restarting countdown");
         raceController.cancel();
+        telegram.sendMessage("[HORN] During sequence - restarting countdown");
         raceController.startSequence();
       } 
       // If in overtime, record lap time
@@ -358,7 +358,7 @@ void setup() {
         hornStart(2000);  // 2 seconden hoorn
         raceController.addLapTime();
         Serial.printf("[LAP] Lap time recorded: %lu ms\n", raceController.getElapsed());
-        
+        telegram.sendMessage("[LAP] Lap time recorded: " + String(raceController.getElapsed() / 1000.0, 2) + " seconds");
         // Send lap time notification
         unsigned long overtimeMs = raceController.getElapsed() - 300000;
         int sec = overtimeMs / 1000;
@@ -370,6 +370,7 @@ void setup() {
       // Otherwise just sound horn
       else {
         hornStart(2000);  // 2 seconden hoorn
+        telegram.sendMessage("[HORN] Horn activated for 2 seconds");
       }
     }
     else if (message.startsWith("telegram:")) {

@@ -44,37 +44,6 @@ bool TelegramHelper::sendMessage(String message) {
   return success;
 }
 
-bool TelegramHelper::sendRaceStatus(bool running, bool sequence, unsigned long remaining, unsigned long elapsed) {
-  String status = "🏁 Race Status\n\n";
-  
-  if (sequence) {
-    int sec = remaining / 1000;
-    int m = sec / 60;
-    int s = sec % 60;
-    status += "⏱️ COUNTDOWN: " + String(m) + ":" + (s < 10 ? "0" : "") + String(s);
-  } else if (running) {
-    if (elapsed > 300000) {
-      // Overtime
-      unsigned long overtimeMs = elapsed - 300000;
-      int sec = overtimeMs / 1000;
-      int m = sec / 60;
-      int s = sec % 60;
-      status += "🏁 RACE STARTED\n";
-      status += "Time: +" + String(m) + ":" + (s < 10 ? "0" : "") + String(s);
-    } else {
-      // Still in countdown
-      int sec = (300000 - elapsed) / 1000;
-      int m = sec / 60;
-      int s = sec % 60;
-      status += "⏱️ Time: " + String(m) + ":" + (s < 10 ? "0" : "") + String(s);
-    }
-  } else {
-    status += "✅ READY";
-  }
-  
-  return sendMessage(status);
-}
-
 bool TelegramHelper::isConfigured() {
   return configured;
 }
