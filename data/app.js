@@ -148,7 +148,7 @@ function updateDisplay(data) {
     stopLapHold();
   }
   if (lapBtn.disabled) {
-    lapBtn.textContent = '⏱ Tussentijd: UIT';
+    lapBtn.textContent = '⏱ Tussentijd';
   }
 }
 
@@ -265,7 +265,7 @@ function startLapHoldPulse() {
 
   lapButtonPressed = true;
   lapBtn.classList.add('active');
-  lapBtn.textContent = '⏱ Tussentijd: AAN';
+  lapBtn.textContent = '⏱ Tussentijd';
   ws.send("lapHoldStart");
 
   lapStopTimer = setTimeout(() => {
@@ -286,7 +286,7 @@ function stopLapHold() {
   if (!lapButtonPressed) return;
   lapButtonPressed = false;
   lapBtn.classList.remove('active');
-  lapBtn.textContent = '⏱ Tussentijd: UIT';
+  lapBtn.textContent = '⏱ Tussentijd';
   if (ws && ws.readyState === WebSocket.OPEN) {
     ws.send("lapHoldStop");
   }
