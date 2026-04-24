@@ -34,6 +34,7 @@ const int HORN = 18;
 unsigned long hornStartTime = 0;
 int hornDuration = 0;
 bool hornActive = false;
+bool hornHoldActive = false;
 
 // Horn pattern sequence (for "end" signal)
 struct HornPattern {
@@ -56,7 +57,7 @@ File uploadFile;
 
 // ================= HORN (NON-BLOCKING) =================
 void hornStart(int ms) {
-  if (!hornActive) {
+  if (!hornActive && !hornHoldActive) {
     hornActive = true;
     hornDuration = ms;
     hornStartTime = millis();
@@ -67,6 +68,25 @@ void hornStart(int ms) {
     Serial.printf("[HORN] Pin %d: Setting LOW (active)\n", HORN);
     digitalWrite(HORN, LOW);
   }
+}
+
+void hornHoldStart() {
+  if (hornHoldActive || endPatternStep >= 0) return;
+
+  hornHoldActive = true;
+  hornActive = false;
+  relaySet(1, 1);
+  digitalWrite(HORN, LOW);
+  Serial.println("[HORN] Hold mode started");
+}
+
+void hornHoldStop() {
+  if (!hornHoldActive) return;
+
+  hornHoldActive = false;
+  digitalWrite(HORN, HIGH);
+  relaySet(1, 0);
+  Serial.println("[HORN] Hold mode stopped");
 }
 
 void hornUpdate() {
@@ -103,6 +123,11 @@ void hornUpdate() {
     return;  // Don't process normal horn when pattern is active
   }
   
+  // Keep horn on while hold button is pressed
+  if (hornHoldActive) {
+    return;
+  }
+
   // Handle normal horn
   if (hornActive && (millis() - hornStartTime >= hornDuration)) {
     Serial.printf("[HORN] Pin %d: Setting HIGH (inactive)\n", HORN);
@@ -373,6 +398,30 @@ void setup() {
         telegram.sendMessage("[HORN] Horn activated for 2 seconds");
       }
     }
+    else if (message == "lapHoldStart") {
+      if (raceController.isRunning() && raceController.getElapsed() > 300000) {
+        Serial.println("[LAP] Hold start received");
+        hornHoldStart();
+      } else {
+        Serial.println("[LAP] Hold start ignored (not in overtime)");
+      }
+    }
+    else if (message == "lapHoldStop") {
+      if (hornHoldActive) {
+        Serial.println("[LAP] Hold stop received");
+        hornHoldStop();
+        if (raceController.isRunning() && raceController.getElapsed() > 300000) {
+          raceController.addLapTime();
+          unsigned long overtimeMs = raceController.getElapsed() - 300000;
+          int sec = overtimeMs / 1000;
+          int m = sec / 60;
+          int s = sec % 60;
+          String lapMsg = "⏱️ Lap time: +" + String(m) + ":" + (s < 10 ? "0" : "") + String(s);
+          telegram.sendMessage(lapMsg);
+          Serial.printf("[LAP] Lap saved on release: +%d:%02d\n", m, s);
+        }
+      }
+    }
     else if (message.startsWith("telegram:")) {
       String userMsg = message.substring(9);
       Serial.printf("[WS] Telegram message request: %s\n", userMsg.c_str());
@@ -550,6 +599,7 @@ void loop() {
   if (!raceController.isSequence() && !raceController.isRunning() && lastStep != -1) {
     lastStep = -1;
     activeRelay = 0;
+    hornHoldStop();
     relayReset(); // Turn off all relays
     Serial.println("[RACE] Reeks geannuleerd - relays gereset");
   }

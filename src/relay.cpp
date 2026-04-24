@@ -19,10 +19,10 @@ void relayInit() {
 
 void relayReset() {
 
-  digitalWrite(RELAY_1, HIGH);
-  digitalWrite(RELAY_2, HIGH);
-  digitalWrite(RELAY_3, HIGH);
-  digitalWrite(RELAY_4, HIGH);
+  digitalWrite(RELAY_1, LOW);
+  digitalWrite(RELAY_2, LOW);
+  digitalWrite(RELAY_3, LOW);
+  digitalWrite(RELAY_4, LOW);
 }
 
 void relaySet(int nr, int state) {
@@ -37,5 +37,5 @@ void relaySet(int nr, int state) {
     default: return;
   }
 
-  digitalWrite(pin, state ? LOW : HIGH);
+  digitalWrite(pin, state ? HIGH : LOW);
 }

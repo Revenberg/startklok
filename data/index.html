@@ -252,6 +252,20 @@ button:active {
   background: linear-gradient(135deg, #ffbb11 0%, #ff9911 100%);
 }
 
+#lapBtn {
+  background: linear-gradient(135deg, #00bcd4 0%, #0097a7 100%);
+  color: #001a1f;
+}
+
+#lapBtn:hover {
+  background: linear-gradient(135deg, #26c6da 0%, #00acc1 100%);
+}
+
+#lapBtn.active {
+  box-shadow: 0 0 24px rgba(0, 188, 212, 0.7);
+  transform: translateY(1px);
+}
+
 button:disabled {
   opacity: 0.5;
   cursor: not-allowed;
@@ -456,6 +470,7 @@ button:disabled {
     <button id="startShortBtn" onclick="startShortRace()">▶ Start (3 min)</button>
     <button id="cancelBtn" onclick="cancelRace()">■ Cancel</button>
     <button id="hornBtn" onclick="soundHorn()">📣 Hoorn</button>
+    <button id="lapBtn">⏱ Tussentijd (vasthouden)</button>
     <button id="endBtn" onclick="endSignal()">🏁 Einde</button>
   </div>
 
@@ -516,6 +531,8 @@ const timerEl = document.getElementById("timer");
 const clockEl = document.getElementById("clock");
 const connectionEl = document.getElementById("connection");
 const versionEl = document.getElementById("version");
+const lapBtn = document.getElementById("lapBtn");
+let lapButtonPressed = false;
 
 // ================= WEBSOCKET =================
 let ws;
@@ -636,6 +653,7 @@ function updateDisplay(data) {
   const startBtn = document.getElementById('startBtn');
   const startShortBtn = document.getElementById('startShortBtn');
   const endBtn = document.getElementById('endBtn');
+  const canUseLapButton = isOvertime;
   
   if (data.sequence || data.running) {
     startBtn.disabled = true;
@@ -645,6 +663,11 @@ function updateDisplay(data) {
     startBtn.disabled = false;
     startShortBtn.disabled = false;
     endBtn.disabled = false;
+  }
+
+  lapBtn.disabled = !canUseLapButton;
+  if (lapBtn.disabled && lapButtonPressed) {
+    stopLapHold();
   }
 }
 
@@ -731,6 +754,52 @@ function soundHorn() {
     console.error("[HORN] WebSocket not connected!", ws ? ws.readyState : "no ws");
     alert('WebSocket niet verbonden!');
   }
+}
+
+function startLapHold() {
+  if (lapButtonPressed) return;
+  if (lapBtn.disabled) return;
+  if (!(ws && ws.readyState === WebSocket.OPEN)) {
+    console.error("[LAP] WebSocket not connected!");
+    return;
+  }
+
+  lapButtonPressed = true;
+  lapBtn.classList.add('active');
+  ws.send("lapHoldStart");
+}
+
+function stopLapHold() {
+  if (!lapButtonPressed) return;
+  if (!(ws && ws.readyState === WebSocket.OPEN)) {
+    lapButtonPressed = false;
+    lapBtn.classList.remove('active');
+    return;
+  }
+
+  lapButtonPressed = false;
+  lapBtn.classList.remove('active');
+  ws.send("lapHoldStop");
+}
+
+function setupLapButton() {
+  lapBtn.addEventListener('pointerdown', (e) => {
+    e.preventDefault();
+    startLapHold();
+  });
+
+  lapBtn.addEventListener('pointerup', (e) => {
+    e.preventDefault();
+    stopLapHold();
+  });
+
+  lapBtn.addEventListener('pointerleave', () => {
+    stopLapHold();
+  });
+
+  lapBtn.addEventListener('pointercancel', () => {
+    stopLapHold();
+  });
 }
 
 function startShortRace() {
@@ -931,6 +1000,7 @@ updateClock();
 setInterval(updateClock, 1000);
 loadSchedule();
 setInterval(loadSchedule, 10000); // Reload schedule every 10 seconds
+setupLapButton();
 // ================= VERSION =================
 fetch('/status')
   .then(r => r.json())
