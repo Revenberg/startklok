@@ -631,20 +631,33 @@ void loop() {
 
   raceController.update();
   
-  // Check scheduled starts (every minute)
-  static unsigned long lastScheduleCheck = 0;
-  if (millis() - lastScheduleCheck >= 60000) { // Check every minute
-    lastScheduleCheck = millis();
-    
+  // Check scheduled starts on minute change (more robust than millis-based 60s polling)
+  static unsigned long lastSchedulePoll = 0;
+  static int lastCheckedMinute = -1;
+  static int lastCheckedDay = -1;
+  if (millis() - lastSchedulePoll >= 5000) {
+    lastSchedulePoll = millis();
+
     // Get current time from RTC
     DateTime now = rtc.now();
-    int scheduleIndex = schedule.checkStartTime(now.hour(), now.minute());
-    
-    if (scheduleIndex >= 0 && !raceController.isSequence() && !raceController.isRunning()) {
-      Serial.printf("[SCHEDULE] Auto-starting for scheduled time: %s\n", 
-                    schedule.getTime(scheduleIndex).toString().c_str());
-      startSequence();
-      schedule.markCompleted(scheduleIndex);
+
+    // Reset completion flags once per new day
+    if (lastCheckedDay != now.day()) {
+      schedule.resetCompleted();
+      lastCheckedDay = now.day();
+    }
+
+    // Only evaluate start condition once per minute
+    if (lastCheckedMinute != now.minute()) {
+      lastCheckedMinute = now.minute();
+      int scheduleIndex = schedule.checkStartTime(now.hour(), now.minute());
+
+      if (scheduleIndex >= 0 && !raceController.isSequence() && !raceController.isRunning()) {
+        Serial.printf("[SCHEDULE] Auto-starting for scheduled time: %s\n",
+                      schedule.getTime(scheduleIndex).toString().c_str());
+        startSequence();
+        schedule.markCompleted(scheduleIndex);
+      }
     }
   }
 

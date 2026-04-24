@@ -114,15 +114,28 @@ int Schedule::checkStartTime(int currentHour, int currentMinute) {
     
     // Calculate start time (5 minutes before scheduled time)
     int scheduledMinutes = times[i].toMinutes();
-    int startMinutes = scheduledMinutes - 5;
+    int startMinutes = (scheduledMinutes - 5 + 1440) % 1440;
     
-    // Check if current time matches start time (within 1 minute window)
-    if (currentMinutes >= startMinutes && currentMinutes < startMinutes + 1) {
+    // Check if current minute matches start minute
+    if (currentMinutes == startMinutes) {
       return i; // Return index of time to start
     }
   }
   
   return -1; // No match
+}
+
+void Schedule::resetCompleted() {
+  bool changed = false;
+  for (auto& t : times) {
+    if (t.completed) {
+      t.completed = false;
+      changed = true;
+    }
+  }
+  if (changed) {
+    Serial.println("[SCHEDULE] Reset completed flags for new day");
+  }
 }
 
 void Schedule::markCompleted(int index) {

@@ -10,8 +10,8 @@ struct ScheduleTime {
   ScheduleTime(int h, int m) : hour(h), minute(m), completed(false) {}
   
   String toString() const {
-    char buf[6];
-    sprintf(buf, "%02d:%02d", hour, minute);
+    char buf[9];
+    sprintf(buf, "%02d:%02d:00", hour, minute);
     return String(buf);
   }
   
@@ -38,6 +38,9 @@ public:
   
   // Mark a time as completed
   void markCompleted(int index);
+
+  // Reset completed flags (e.g. at a new day)
+  void resetCompleted();
   
   // Get all times as JSON array
   String toJson() const;
