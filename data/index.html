@@ -480,7 +480,7 @@ button:disabled {
     <button id="startShortBtn" onclick="startShortRace()">▶ Start (3 min)</button>
     <button id="cancelBtn" onclick="cancelRace()">■ Cancel</button>
     <button id="hornBtn" onclick="soundHorn()">📣 Hoorn</button>
-    <button id="lapBtn">⏱ Tussentijd (vasthouden)</button>
+    <button id="lapBtn" onclick="toggleLapHold()">⏱ Tussentijd: UIT</button>
     <button id="endBtn" onclick="endSignal()">🏁 Einde</button>
   </div>
 
@@ -680,6 +680,9 @@ function updateDisplay(data) {
   if (lapBtn.disabled && lapButtonPressed) {
     stopLapHold();
   }
+  if (lapBtn.disabled) {
+    lapBtn.textContent = '⏱ Tussentijd: UIT';
+  }
 }
 
 // ================= LAP TIMES DISPLAY =================
@@ -767,50 +770,40 @@ function soundHorn() {
   }
 }
 
-function startLapHold() {
-  if (lapButtonPressed) return;
+function toggleLapHold() {
   if (lapBtn.disabled) return;
   if (!(ws && ws.readyState === WebSocket.OPEN)) {
     console.error("[LAP] WebSocket not connected!");
     return;
   }
 
-  lapButtonPressed = true;
-  lapBtn.classList.add('active');
-  ws.send("lapHoldStart");
+  if (lapButtonPressed) {
+    // Zet UIT
+    lapButtonPressed = false;
+    lapBtn.classList.remove('active');
+    lapBtn.textContent = '⏱ Tussentijd: UIT';
+    ws.send("lapHoldStop");
+  } else {
+    // Zet AAN
+    lapButtonPressed = true;
+    lapBtn.classList.add('active');
+    lapBtn.textContent = '⏱ Tussentijd: AAN';
+    ws.send("lapHoldStart");
+  }
 }
 
 function stopLapHold() {
   if (!lapButtonPressed) return;
-  if (!(ws && ws.readyState === WebSocket.OPEN)) {
-    lapButtonPressed = false;
-    lapBtn.classList.remove('active');
-    return;
-  }
-
   lapButtonPressed = false;
   lapBtn.classList.remove('active');
-  ws.send("lapHoldStop");
+  lapBtn.textContent = '⏱ Tussentijd: UIT';
+  if (ws && ws.readyState === WebSocket.OPEN) {
+    ws.send("lapHoldStop");
+  }
 }
 
 function setupLapButton() {
-  lapBtn.addEventListener('pointerdown', (e) => {
-    e.preventDefault();
-    startLapHold();
-  });
-
-  lapBtn.addEventListener('pointerup', (e) => {
-    e.preventDefault();
-    stopLapHold();
-  });
-
-  lapBtn.addEventListener('pointerleave', () => {
-    stopLapHold();
-  });
-
-  lapBtn.addEventListener('pointercancel', () => {
-    stopLapHold();
-  });
+  // Geen extra listeners nodig - onclick="toggleLapHold()" in HTML
 }
 
 function startShortRace() {
