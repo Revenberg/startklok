@@ -7,6 +7,10 @@ const ipEl = document.getElementById("ipAddress");
 const versionEl = document.getElementById("version");
 const lapBtn = document.getElementById("lapBtn");
 let lapButtonPressed = false;
+let lapStopTimer = null;
+let lapRestartTimer = null;
+const LAP_ON_DURATION_MS = 2000;
+const LAP_RESTART_OFF_MS = 300;
 
 // ================= WEBSOCKET =================
 let ws;
@@ -195,17 +199,17 @@ function updateFlag(flag) {
     // 5:00-4:00 en 1:00-0:00: Alleen Klassevlag
     console.log("  → Showing Klassevlag only");
     if (classFlag) classFlag.classList.add('active');
-    labelEl.textContent = 'Klassevlag';
+    // labelEl.textContent = 'Klassevlag';
   } else if (flag === 'class-p') {
     // 4:00-1:00: Beide vlaggen
     console.log("  → Showing both flags");
     if (classFlag) classFlag.classList.add('active');
     if (pFlag) pFlag.classList.add('active');
-    labelEl.textContent = 'Klassevlag + P-Vlag';
+    // labelEl.textContent = 'Klassevlag + P-Vlag';
   } else {
     // Geen vlaggen
     console.log("  → Hiding all flags");
-    labelEl.textContent = '';
+    // labelEl.textContent = '';
   }
 }
 
@@ -241,21 +245,44 @@ function toggleLapHold() {
   }
 
   if (lapButtonPressed) {
-    // Zet UIT
-    lapButtonPressed = false;
-    lapBtn.classList.remove('active');
-    lapBtn.textContent = '⏱ Tussentijd: UIT';
-    ws.send("lapHoldStop");
+    // Binnen 2 seconden opnieuw geklikt: eerst kort UIT, dan opnieuw 2 seconden AAN
+    stopLapHold();
+    lapRestartTimer = setTimeout(() => {
+      if (lapBtn.disabled) return;
+      if (!(ws && ws.readyState === WebSocket.OPEN)) return;
+      startLapHoldPulse();
+    }, LAP_RESTART_OFF_MS);
   } else {
-    // Zet AAN
-    lapButtonPressed = true;
-    lapBtn.classList.add('active');
-    lapBtn.textContent = '⏱ Tussentijd: AAN';
-    ws.send("lapHoldStart");
+    startLapHoldPulse();
   }
 }
 
+function startLapHoldPulse() {
+  if (lapStopTimer) {
+    clearTimeout(lapStopTimer);
+    lapStopTimer = null;
+  }
+
+  lapButtonPressed = true;
+  lapBtn.classList.add('active');
+  lapBtn.textContent = '⏱ Tussentijd: AAN';
+  ws.send("lapHoldStart");
+
+  lapStopTimer = setTimeout(() => {
+    stopLapHold();
+  }, LAP_ON_DURATION_MS);
+}
+
 function stopLapHold() {
+  if (lapRestartTimer) {
+    clearTimeout(lapRestartTimer);
+    lapRestartTimer = null;
+  }
+  if (lapStopTimer) {
+    clearTimeout(lapStopTimer);
+    lapStopTimer = null;
+  }
+
   if (!lapButtonPressed) return;
   lapButtonPressed = false;
   lapBtn.classList.remove('active');
