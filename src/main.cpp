@@ -187,6 +187,10 @@ void handleStatus() {
   json += "\"running\":" + String(raceController.isRunning());
   json += ",\"sequence\":" + String(raceController.isSequence());
   json += ",\"remaining\":" + String(raceController.getRemaining());
+  String ip = (WiFi.getMode() == WIFI_AP || WiFi.getMode() == WIFI_AP_STA)
+              ? WiFi.softAPIP().toString()
+              : WiFi.localIP().toString();
+  json += ",\"ip\":\"" + ip + "\"";
   json += ",\"version\":\"" + String(VERSION_STRING) + "\"";
   json += "}";
   server.send(200, "application/json", json);

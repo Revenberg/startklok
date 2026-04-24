@@ -54,6 +54,13 @@ body {
   background: #333;
 }
 
+#ipAddress {
+  font-size: 13px;
+  color: #9bdcff;
+  font-family: monospace;
+  margin-right: 10px;
+}
+
 #connection.connected { background: #00aa44; color: white; }
 #connection.disconnected { background: #aa0000; color: white; }
 
@@ -445,7 +452,10 @@ button:disabled {
     <span id="rtcIcon" title="RTC Status">⏱️</span>
     <span id="clockTime">--:--:--</span>
   </div>
-  <div id="connection" class="disconnected">●  CONNECTING</div>
+  <div style="display: flex; align-items: center;">
+    <div id="ipAddress">IP: ---.---.---.---</div>
+    <div id="connection" class="disconnected">●  CONNECTING</div>
+  </div>
 </div>
 
 <div class="container">
@@ -530,6 +540,7 @@ const statusEl = document.getElementById("status");
 const timerEl = document.getElementById("timer");
 const clockEl = document.getElementById("clock");
 const connectionEl = document.getElementById("connection");
+const ipEl = document.getElementById("ipAddress");
 const versionEl = document.getElementById("version");
 const lapBtn = document.getElementById("lapBtn");
 let lapButtonPressed = false;
@@ -1005,6 +1016,9 @@ setupLapButton();
 fetch('/status')
   .then(r => r.json())
   .then(data => {
+    if (data.ip) {
+      ipEl.textContent = "IP: " + data.ip;
+    }
     if (data.version) {
       versionEl.textContent = data.version;
     }

@@ -39,89 +39,146 @@ void saveConfig() {
 }
 
 // ================= WIFI =================
+static const unsigned long AP_CLIENT_WAIT_MS = 30000;
+
 bool tryConnectToNetwork(String ssid, String pass) {
   Serial.printf("[WiFi] Trying to connect to: %s\n", ssid.c_str());
-  
+
   WiFi.begin(ssid.c_str(), pass.c_str());
-  
+
   int attempts = 0;
   while (WiFi.status() != WL_CONNECTED && attempts < 20) {
     delay(500);
     Serial.print(".");
     attempts++;
   }
-  
+
   if (WiFi.status() == WL_CONNECTED) {
     Serial.printf("\n[WiFi] ✓ Connected to: %s\n", ssid.c_str());
     Serial.printf("[WiFi] IP: %s\n", WiFi.localIP().toString().c_str());
     return true;
   }
-  
+
   Serial.println("\n[WiFi] ✗ Connection failed");
   return false;
 }
 
-void startWiFi() {
-  WiFi.mode(WIFI_STA);
-  
-  // Try multi-network connection if netwerken.txt exists
-  if (LittleFS.exists("/netwerken.txt")) {
-    Serial.println("[WiFi] Reading netwerken.txt...");
-    
-    File f = LittleFS.open("/netwerken.txt", "r");
-    if (f) {
-      // Scan for available networks
-      Serial.println("[WiFi] Scanning for networks...");
-      int n = WiFi.scanNetworks();
-      Serial.printf("[WiFi] Found %d networks\n", n);
-      
-      // Read networks from file and try to connect
-      while (f.available()) {
-        String line = f.readStringUntil('\n');
-        line.trim();
-        
-        if (line.length() == 0 || line.startsWith("#")) continue;
-        
-        // Parse line: "SSID PASSWORD"
-        int spacePos = line.indexOf(' ');
-        if (spacePos > 0) {
-          String ssid = line.substring(0, spacePos);
-          String pass = line.substring(spacePos + 1);
-          pass.trim();
-          
-          // Check if this network is available
-          for (int i = 0; i < n; i++) {
-            if (WiFi.SSID(i) == ssid) {
-              Serial.printf("[WiFi] Found configured network: %s\n", ssid.c_str());
-              
-              if (tryConnectToNetwork(ssid, pass)) {
-                f.close();
-                return;  // Successfully connected
-              }
-              break;
-            }
-          }
-        }
-      }
-      f.close();
-      
-      Serial.println("[WiFi] No configured networks found, falling back to config.json");
-    }
+bool startAccessPoint() {
+  Serial.println("[WiFi] Starting AP mode...");
+  WiFi.mode(WIFI_AP);
+
+  bool started = false;
+  if (cfg.pass.length() == 0) {
+    started = WiFi.softAP(cfg.ssid.c_str());
+  } else {
+    started = WiFi.softAP(cfg.ssid.c_str(), cfg.pass.c_str());
   }
-  
-  // Fallback to config.json (old method)
-  if (cfg.mode == "STA") {
-    if (tryConnectToNetwork(cfg.ssid, cfg.pass)) {
-      return;
+
+  if (started) {
+    Serial.printf("[WiFi] AP started: %s\n", cfg.ssid.c_str());
+    Serial.printf("[WiFi] AP IP: %s\n", WiFi.softAPIP().toString().c_str());
+  } else {
+    Serial.println("[WiFi] AP start failed");
+  }
+
+  return started;
+}
+
+bool waitForApClient(unsigned long timeoutMs) {
+  unsigned long start = millis();
+  while (millis() - start < timeoutMs) {
+    if (WiFi.softAPgetStationNum() > 0) {
+      Serial.printf("[WiFi] AP client connected (%d station)\n", WiFi.softAPgetStationNum());
+      return true;
+    }
+    delay(500);
+  }
+
+  Serial.println("[WiFi] No AP client connected within timeout");
+  return false;
+}
+
+bool tryConfiguredNetworks() {
+  if (!LittleFS.exists("/netwerken.txt")) {
+    return false;
+  }
+
+  Serial.println("[WiFi] Reading netwerken.txt...");
+  File f = LittleFS.open("/netwerken.txt", "r");
+  if (!f) {
+    return false;
+  }
+
+  Serial.println("[WiFi] Scanning for networks...");
+  int n = WiFi.scanNetworks();
+  Serial.printf("[WiFi] Found %d networks\n", n);
+
+  while (f.available()) {
+    String line = f.readStringUntil('\n');
+    line.trim();
+
+    if (line.length() == 0 || line.startsWith("#")) {
+      continue;
+    }
+
+    int spacePos = line.indexOf(' ');
+    if (spacePos <= 0) {
+      continue;
+    }
+
+    String ssid = line.substring(0, spacePos);
+    String pass = line.substring(spacePos + 1);
+    pass.trim();
+
+    for (int i = 0; i < n; i++) {
+      if (WiFi.SSID(i) == ssid) {
+        Serial.printf("[WiFi] Found configured network: %s\n", ssid.c_str());
+        if (tryConnectToNetwork(ssid, pass)) {
+          f.close();
+          return true;
+        }
+        break;
+      }
     }
   }
 
-  // Fallback to AP mode
-  Serial.println("[WiFi] Starting AP mode...");
-  WiFi.mode(WIFI_AP);
-  WiFi.softAP(cfg.ssid.c_str(), cfg.pass.c_str());
-  Serial.printf("[WiFi] AP started: %s\n", cfg.ssid.c_str());
-  Serial.printf("[WiFi] IP: %s\n", WiFi.softAPIP().toString().c_str());
+  f.close();
+  Serial.println("[WiFi] No configured networks connected");
+  return false;
+}
+
+void startWiFi() {
+  if (cfg.mode == "AP") {
+    startAccessPoint();
+
+    if (waitForApClient(AP_CLIENT_WAIT_MS)) {
+      return;
+    }
+
+    Serial.println("[WiFi] No AP client, trying configured networks...");
+    WiFi.softAPdisconnect(true);
+    WiFi.mode(WIFI_STA);
+
+    if (tryConfiguredNetworks()) {
+      return;
+    }
+
+    Serial.println("[WiFi] Falling back to AP mode");
+    startAccessPoint();
+    return;
+  }
+
+  WiFi.mode(WIFI_STA);
+
+  if (tryConfiguredNetworks()) {
+    return;
+  }
+
+  if (cfg.mode == "STA" && tryConnectToNetwork(cfg.ssid, cfg.pass)) {
+    return;
+  }
+
+  startAccessPoint();
 }
 
 // ================= SETUP PAGE =================
