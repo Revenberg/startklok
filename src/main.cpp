@@ -63,15 +63,17 @@ File uploadFile;
 // ================= HORN (NON-BLOCKING) =================
 void hornStart(int ms) {
   if (!hornActive && !hornHoldActive) {
+    // Start-priority: switch outputs immediately on trigger.
+    relaySet(1, 1); // Relay 1 ON
+    digitalWrite(HORN, LOW);
+
     hornActive = true;
     hornDuration = ms;
     hornStartTime = millis();
-    
-    relaySet(1, 1); // Relay 1 ON
+
     Serial.println("\n========== HORN ACTIVATED ==========");
     Serial.printf("[HORN] Duration: %d ms\n", ms);
     Serial.printf("[HORN] Pin %d: Setting LOW (active)\n", HORN);
-    digitalWrite(HORN, LOW);
   }
 }
 
@@ -399,6 +401,9 @@ void setup() {
     }
     else if (message == "horn") {
       Serial.println("[WS] ✓ Horn command received!");
+
+      // Start-priority mode: trigger horn first, handle all extra logic afterwards.
+      hornStart(2000);  // 2 seconden hoorn
       
       // If during countdown sequence, restart
       if (raceController.isSequence()) {
@@ -409,7 +414,6 @@ void setup() {
       } 
       // If in overtime, record lap time
       else if (raceController.isRunning() && raceController.getElapsed() > 300000) {
-        hornStart(2000);  // 2 seconden hoorn
         raceController.addLapTime();
         Serial.printf("[LAP] Lap time recorded: %lu ms\n", raceController.getElapsed());
         telegram.sendMessage("[LAP] Lap time recorded: " + String(raceController.getElapsed() / 1000.0, 2) + " seconds");
@@ -423,7 +427,6 @@ void setup() {
       }
       // Otherwise just sound horn
       else {
-        hornStart(2000);  // 2 seconden hoorn
         telegram.sendMessage("[HORN] Horn activated for 2 seconds");
       }
     }
