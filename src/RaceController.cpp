@@ -127,7 +127,9 @@ void RaceController::processSequenceEvents() {
         sequence = false;
         shortSequence = false;
         running = true;
-        startTime = seqStart;
+        // Normalize elapsed so timer always switches to count-up right after 0:00,
+        // also for the short (3 min) procedure.
+        startTime = now - 300000UL;
         
         Serial.println("[RACE] ✅ Race started!");
       } else {
