@@ -186,6 +186,26 @@ void handleRoot() {
   }
 }
 
+void handleStyle() {
+  if (LittleFS.exists("/style.css")) {
+    File f = LittleFS.open("/style.css", "r");
+    server.streamFile(f, "text/css; charset=utf-8");
+    f.close();
+  } else {
+    server.send(404, "text/plain", "style.css missing");
+  }
+}
+
+void handleAppJs() {
+  if (LittleFS.exists("/app.js")) {
+    File f = LittleFS.open("/app.js", "r");
+    server.streamFile(f, "application/javascript; charset=utf-8");
+    f.close();
+  } else {
+    server.send(404, "text/plain", "app.js missing");
+  }
+}
+
 // ================= STATUS =================
 void handleStatus() {
   String json = "{";
@@ -450,6 +470,8 @@ void setup() {
 
   // ================= ROUTES =================
   server.on("/", handleRoot);
+  server.on("/style.css", handleStyle);
+  server.on("/app.js", handleAppJs);
 
   server.on("/status", handleStatus);
   
