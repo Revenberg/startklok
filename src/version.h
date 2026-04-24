@@ -6,7 +6,7 @@
 #define VERSION_PATCH 0
 
 // Build number (auto-incremented on each deploy)
-#define BUILD_NUMBER 26
+#define BUILD_NUMBER 0
 
 // Version string
-#define VERSION_STRING "v1.0.0-26"
+#define VERSION_STRING "v1.0.0"
