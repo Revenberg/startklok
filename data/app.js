@@ -5,10 +5,13 @@ const clockEl = document.getElementById("clock");
 const connectionEl = document.getElementById("connection");
 const ipEl = document.getElementById("ipAddress");
 const versionEl = document.getElementById("version");
+const hornBtn = document.getElementById("hornBtn");
 const lapBtn = document.getElementById("lapBtn");
 let lapButtonPressed = false;
+let hornActiveTimer = null;
 let lapStopTimer = null;
 let lapRestartTimer = null;
+const HORN_ACTIVE_MS = 2000;
 const LAP_ON_DURATION_MS = 2000;
 const LAP_RESTART_OFF_MS = 300;
 
@@ -231,6 +234,16 @@ function soundHorn() {
   if (ws && ws.readyState === WebSocket.OPEN) {
     console.log("[HORN] Sending horn command via WebSocket");
     ws.send("horn");
+
+    // Visual feedback: horn button green while horn is active
+    hornBtn.classList.add('active');
+    if (hornActiveTimer) {
+      clearTimeout(hornActiveTimer);
+    }
+    hornActiveTimer = setTimeout(() => {
+      hornBtn.classList.remove('active');
+      hornActiveTimer = null;
+    }, HORN_ACTIVE_MS);
   } else {
     console.error("[HORN] WebSocket not connected!", ws ? ws.readyState : "no ws");
     alert('WebSocket niet verbonden!');

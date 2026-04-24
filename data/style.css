@@ -251,6 +251,12 @@ button:active {
   background: linear-gradient(135deg, #ffbb11 0%, #ff9911 100%);
 }
 
+#hornBtn.active {
+  background: linear-gradient(135deg, #00ff88 0%, #00cc66 100%);
+  color: #001a0d;
+  box-shadow: 0 0 24px rgba(0, 255, 136, 0.7);
+}
+
 #lapBtn {
   background: linear-gradient(135deg, #00bcd4 0%, #0097a7 100%);
   color: #001a1f;
