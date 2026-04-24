@@ -1,5 +1,6 @@
 #include <Arduino.h>
 #include <WiFi.h>
+#include <DNSServer.h>
 #include <WebServer.h>
 #include <WebSocketsServer.h>
 #include <LittleFS.h>
@@ -23,6 +24,10 @@ RTC_DS3231 rtc;
 
 // ================= SERVER =================
 WebServer server(80);
+
+// ================= CAPTIVE PORTAL =================
+DNSServer dnsServer;
+static bool captivePortalActive = false;
 
 // ================= BROADCAST THROTTLE =================
 unsigned long lastBroadcast = 0;
@@ -523,6 +528,19 @@ void setup() {
     handleOTAUpload
   );
 
+  // Start captive portal DNS in AP mode
+  if (WiFi.getMode() == WIFI_AP || WiFi.getMode() == WIFI_AP_STA) {
+    dnsServer.start(53, "*", WiFi.softAPIP());
+    captivePortalActive = true;
+    Serial.println("[Captive] DNS server started - redirecting all to AP IP");
+
+    // Catch-all: stuur onbekende paden door naar de dashboard
+    server.onNotFound([]() {
+      server.sendHeader("Location", "http://" + WiFi.softAPIP().toString() + "/", true);
+      server.send(302, "text/plain", "");
+    });
+  }
+
   Serial.println("Starting web server on port 80...");
   server.begin();
   
@@ -542,6 +560,9 @@ void loop() {
   hornUpdate();  // Non-blocking horn timing
   webUI.update();
   server.handleClient();
+  if (captivePortalActive) {
+    dnsServer.processNextRequest();
+  }
 
   // Track sequence step changes and relay timing
   static int lastStep = -1;
