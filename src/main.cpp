@@ -556,11 +556,22 @@ void setup() {
     captivePortalActive = true;
     Serial.println("[Captive] DNS server started - redirecting all to AP IP");
 
-    // Catch-all: stuur onbekende paden door naar de dashboard
-    server.onNotFound([]() {
+    auto captiveRedirect = []() {
       server.sendHeader("Location", "http://" + WiFi.softAPIP().toString() + "/", true);
       server.send(302, "text/plain", "");
-    });
+    };
+
+    // Captive portal probes used by Android, iOS/macOS, and Windows
+    server.on("/generate_204", captiveRedirect);      // Android
+    server.on("/gen_204", captiveRedirect);           // Android (fallback)
+    server.on("/hotspot-detect.html", captiveRedirect); // Apple
+    server.on("/ncsi.txt", captiveRedirect);          // Windows NCSI
+    server.on("/connecttest.txt", captiveRedirect);   // Windows connect test
+    server.on("/redirect", captiveRedirect);          // Generic captive probe
+    server.on("/fwlink", captiveRedirect);            // Microsoft fwlink probe
+
+    // Catch-all: stuur onbekende paden door naar de dashboard
+    server.onNotFound(captiveRedirect);
   }
 
   Serial.println("Starting web server on port 80...");
