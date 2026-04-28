@@ -8,7 +8,6 @@
 #include "relay.h"
 #include "RaceController.h"
 #include "WebUI.h"
-#include "lcd.h"
 #include "version.h"
 
 // ================= CONTROLLER INSTANCES =================
@@ -142,7 +141,6 @@ void setup() {
   LittleFS.begin(true);
 
   relayInit();
-  lcdInit();
   
   raceController.begin();
   webUI.begin();
@@ -150,8 +148,6 @@ void setup() {
   loadConfig();
   startWiFi();
   registerConfigRoutes(server);
-  
-  lcdShowIdle(cfg.mode, cfg.ssid);
 
   // ================= ROUTES =================
   server.on("/", handleRoot);
@@ -210,13 +206,6 @@ void loop() {
   server.handleClient();
 
   raceController.update();
-
-  // Update LCD display
-  if (raceController.isRunning() || raceController.isSequence()) {
-    lcdShowRace(raceController.getRemaining());
-  } else {
-    lcdShowIdle(cfg.mode, cfg.ssid);
-  }
 
   // Throttled WebSocket broadcast
   unsigned long now = millis();
