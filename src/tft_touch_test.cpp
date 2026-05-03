@@ -16,6 +16,21 @@ unsigned long lastTouchPrintMs = 0;
 bool lastTouched = false;
 bool messageToggle = false;
 
+void drawFigure() {
+  // Draw a simple sailboat figure to verify lines, triangles and circles.
+  const int baseX = 92;
+  const int baseY = 98;
+
+  tft.fillRoundRect(baseX, baseY + 24, 130, 16, 6, TFT_NAVY);
+  tft.drawRoundRect(baseX, baseY + 24, 130, 16, 6, TFT_WHITE);
+
+  tft.drawLine(baseX + 66, baseY - 18, baseX + 66, baseY + 24, TFT_WHITE);
+  tft.fillTriangle(baseX + 66, baseY - 18, baseX + 66, baseY + 20, baseX + 104, baseY + 10, TFT_ORANGE);
+  tft.fillTriangle(baseX + 66, baseY - 10, baseX + 34, baseY + 14, baseX + 66, baseY + 14, TFT_CYAN);
+
+  tft.fillCircle(baseX + 120, baseY - 8, 7, TFT_YELLOW);
+}
+
 void drawMessage(const char* text) {
   tft.fillRect(12, 42, 296, 48, TFT_BLACK);
   tft.setTextColor(TFT_WHITE, TFT_BLACK);
@@ -35,31 +50,36 @@ void drawStaticUi() {
   tft.drawRect(8, 36, 304, 60, TFT_WHITE);
   drawMessage("Startscherm actief");
 
-  // Color bars to quickly verify RGB output and orientation.
-  tft.fillRect(8, 110, 60, 40, TFT_RED);
-  tft.fillRect(72, 110, 60, 40, TFT_GREEN);
-  tft.fillRect(136, 110, 60, 40, TFT_BLUE);
-  tft.fillRect(200, 110, 60, 40, TFT_YELLOW);
-  tft.fillRect(264, 110, 48, 40, TFT_CYAN);
+  tft.setTextColor(TFT_LIGHTGREY, TFT_BLACK);
+  tft.setCursor(10, 96);
+  tft.println("Figuurtest: zeilboot + zon");
+  drawFigure();
 
-  tft.drawRect(8, 165, 304, 146, TFT_DARKGREY);
-  tft.setCursor(14, 172);
+  // Color bars to quickly verify RGB output and orientation.
+  tft.fillRect(8, 146, 60, 30, TFT_RED);
+  tft.fillRect(72, 146, 60, 30, TFT_GREEN);
+  tft.fillRect(136, 146, 60, 30, TFT_BLUE);
+  tft.fillRect(200, 146, 60, 30, TFT_YELLOW);
+  tft.fillRect(264, 146, 48, 30, TFT_CYAN);
+
+  tft.drawRect(8, 182, 304, 128, TFT_DARKGREY);
+  tft.setCursor(14, 188);
   tft.println("Raw touch:");
 }
 
 void drawTouchData(int x, int y, int z) {
-  tft.fillRect(14, 194, 290, 40, TFT_BLACK);
+  tft.fillRect(14, 210, 290, 28, TFT_BLACK);
   tft.setTextColor(TFT_GREEN, TFT_BLACK);
-  tft.setCursor(14, 194);
+  tft.setCursor(14, 210);
   tft.printf("X: %4d  Y: %4d  Z: %4d", x, y, z);
 
   // Draw a marker in the touch area (mapped from raw range).
   int px = map(x, 200, 3800, 10, 302);
-  int py = map(y, 200, 3800, 167, 309);
+  int py = map(y, 200, 3800, 184, 307);
   px = constrain(px, 10, 302);
-  py = constrain(py, 167, 309);
+  py = constrain(py, 184, 307);
 
-  tft.fillRect(10, 236, 300, 72, TFT_BLACK);
+  tft.fillRect(10, 240, 300, 68, TFT_BLACK);
   tft.drawLine(px - 6, py, px + 6, py, TFT_MAGENTA);
   tft.drawLine(px, py - 6, px, py + 6, TFT_MAGENTA);
 }
