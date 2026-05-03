@@ -6,6 +6,7 @@
 struct SequenceEvent {
   unsigned long timestamp;     // Absolute time (millis)
   int remainingMinutes;        // Minutes remaining (for display/telegram)
+  int hornDuration;            // Horn duration in ms (0 = no horn)
   bool hornDone;               // Horn signal completed
   bool telegramDone;           // Telegram notification sent
 };

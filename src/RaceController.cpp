@@ -13,22 +13,25 @@ void RaceController::begin() {
 void RaceController::scheduleEvents(bool isShort) {
   unsigned long now = millis();
   
+  // events array will be processed in order, so we can just fill it sequentially based on the selected procedure.
+  // event {timestamp, remainingMinutes, hornDone, telegramDone}
+
   if (isShort) {
     // 3-minute sequence: signals at 3, 2, 1, 0
     eventCount = 4;
     
-    events[0] = {now, 3, false, false};              // T+0ms: 3 minutes remaining
-    events[1] = {now + 60000, 2, false, false};      // T+60s: 2 minutes remaining
-    events[2] = {now + 120000, 1, false, false};     // T+120s: 1 minute remaining
-    events[3] = {now + 180000, 0, false, false};     // T+180s: START!
+    events[0] = {now,           3, 2000, false, false};  // T+0ms:   3 min remaining
+    events[1] = {now +  60000,  2, 2000, false, false};  // T+60s:   2 min remaining
+    events[2] = {now + 120000,  1, 4000, false, false};  // T+120s:  1 min remaining
+    events[3] = {now + 180000,  0, 2000, false, false};  // T+180s:  START! (longer blast)
   } else {
     // 5-minute sequence: signals at 5, 4, 1, 0
     eventCount = 4;
     
-    events[0] = {now, 5, false, false};              // T+0ms: 5 minutes remaining
-    events[1] = {now + 60000, 4, false, false};      // T+60s: 4 minutes remaining
-    events[2] = {now + 240000, 1, false, false};     // T+240s: 1 minute remaining
-    events[3] = {now + 300000, 0, false, false};     // T+300s: START!
+    events[0] = {now,           5, 2000, false, false};  // T+0ms:   5 min remaining
+    events[1] = {now +  60000,  4, 2000, false, false};  // T+60s:   4 min remaining
+    events[2] = {now + 240000,  1, 4000, false, false};  // T+240s:  1 min remaining
+    events[3] = {now + 300000,  0, 2000, false, false};  // T+300s:  START! (longer blast)
   }
   
   currentEvent = 0;
@@ -107,9 +110,11 @@ void RaceController::processSequenceEvents() {
     
     // PRIORITY 1: Horn signal (must be precise)
     if (!event.hornDone) {
-      hornStart(2000);  // 2 second horn
+      if (event.hornDuration > 0) {
+        hornStart(event.hornDuration);
+      }
       event.hornDone = true;
-      Serial.printf("[RACE] 🔊 Horn signal at %d minutes remaining\n", event.remainingMinutes);
+      Serial.printf("[RACE] 🔊 Horn signal at %d min remaining (%d ms)\n", event.remainingMinutes, event.hornDuration);
     }
     
     // PRIORITY 2: Telegram notification (async, can be delayed)

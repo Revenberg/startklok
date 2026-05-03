@@ -5,8 +5,12 @@
 
 // Test sketch for common 2.4 inch 240x320 SPI TFT + XPT2046 touch modules.
 // Adjust these pins to your wiring if needed.
-static const uint8_t TOUCH_CS_PIN = 15;
-static const uint8_t TOUCH_IRQ_PIN = 4;
+#ifdef TOUCH_CS
+static const uint8_t TOUCH_CS_PIN = TOUCH_CS;
+#else
+static const uint8_t TOUCH_CS_PIN = 5;
+#endif
+static const uint8_t TOUCH_IRQ_PIN = 27;
 
 TFT_eSPI tft = TFT_eSPI();
 XPT2046_Touchscreen touch(TOUCH_CS_PIN, TOUCH_IRQ_PIN);

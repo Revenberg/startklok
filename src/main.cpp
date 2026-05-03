@@ -7,6 +7,10 @@
 #include <Update.h>
 #include <time.h>
 #include <Wire.h>
+#include <SPI.h>
+#include <Adafruit_GFX.h>
+#include <Adafruit_ILI9341.h>
+#include <XPT2046_Touchscreen.h>
 
 #include "config.h"
 #include "relay.h"
@@ -35,11 +39,71 @@ unsigned long lastBroadcast = 0;
 const unsigned long BROADCAST_INTERVAL = 500; // ms - broadcast state every 500ms (2x per second)
 
 // ================= HORN =================
-const int HORN = 18;
+const int HORN = -1;
 unsigned long hornStartTime = 0;
 int hornDuration = 0;
 bool hornActive = false;
 bool hornHoldActive = false;
+
+// ================= TFT + TOUCH =================
+#define TFT_CS        5
+#define TFT_DC        4
+#define TFT_RST      19
+#define TFT_BLK      15
+#define TFT_SCK      18
+#define TFT_MOSI     23
+#define TFT_MISO      2
+#define TOUCH_CS_PIN 13
+#define TOUCH_IRQ_PIN 14
+
+Adafruit_ILI9341 tft(TFT_CS, TFT_DC, TFT_RST);
+XPT2046_Touchscreen touch(TOUCH_CS_PIN, TOUCH_IRQ_PIN);
+
+struct TftButton {
+  int x, y, w, h;
+  const char* label;
+  uint16_t color;
+  bool visible;
+};
+
+enum TftButtonId {
+  BTN_START,        // START 5M - idle only
+  BTN_START_SHORT,  // START 3M - idle only
+  BTN_STOP,         // STOP     - sequence/running only (full width row 1)
+  BTN_END,          // EINDE    - running only
+  BTN_HORN,         // TOETER   - always
+  BTN_R1, BTN_R2, BTN_R3, BTN_R4,
+  BTN_COUNT
+};
+
+// Layout constants
+#define BTN_ROW1_Y  48
+#define BTN_ROW2_Y  96
+#define BTN_ROW3_Y  144
+#define BTN_H       44
+#define BTN_H3      38
+
+TftButton tftButtons[BTN_COUNT] = {
+  {5,   BTN_ROW1_Y, 150, BTN_H,  "START 5M", ILI9341_DARKGREEN, true},
+  {160, BTN_ROW1_Y, 155, BTN_H,  "START 3M", ILI9341_NAVY,      true},
+  {5,   BTN_ROW1_Y, 310, BTN_H,  "STOP",     ILI9341_RED,       false},
+  {160, BTN_ROW2_Y, 155, BTN_H,  "EINDE",    ILI9341_ORANGE,    false},
+  {5,   BTN_ROW2_Y, 150, BTN_H,  "TOETER",   ILI9341_MAGENTA,   true},
+  {5,   BTN_ROW3_Y,  73, BTN_H3, "R1",       ILI9341_NAVY,      true},
+  {83,  BTN_ROW3_Y,  73, BTN_H3, "R2",       ILI9341_NAVY,      true},
+  {161, BTN_ROW3_Y,  73, BTN_H3, "R3",       ILI9341_NAVY,      true},
+  {239, BTN_ROW3_Y,  76, BTN_H3, "R4",       ILI9341_NAVY,      true}
+};
+
+String tftLastAction = "Klaar";
+bool tftTouchDown = false;
+unsigned long tftLastRefresh = 0;
+int tftLastRemainingSec = -1;
+bool tftLastSequence = false;
+bool tftLastRunning = false;
+int tftLastRelayState[4] = {-1, -1, -1, -1};
+char tftLastTimeStr[9] = "";
+char tftLastNextStart[6] = "";
 
 // Horn pattern sequence (for "end" signal)
 struct HornPattern {
@@ -65,7 +129,9 @@ void hornStart(int ms) {
   if (!hornActive && !hornHoldActive) {
     // Start-priority: switch outputs immediately on trigger.
     relaySet(1, 1); // Relay 1 ON
-    digitalWrite(HORN, LOW);
+    if (HORN >= 0) {
+      digitalWrite(HORN, LOW);
+    }
 
     hornActive = true;
     hornDuration = ms;
@@ -83,7 +149,9 @@ void hornHoldStart() {
   hornHoldActive = true;
   hornActive = false;
   relaySet(1, 1);
-  digitalWrite(HORN, LOW);
+  if (HORN >= 0) {
+    digitalWrite(HORN, LOW);
+  }
   Serial.println("[HORN] Hold mode started");
 }
 
@@ -91,7 +159,9 @@ void hornHoldStop() {
   if (!hornHoldActive) return;
 
   hornHoldActive = false;
-  digitalWrite(HORN, HIGH);
+  if (HORN >= 0) {
+    digitalWrite(HORN, HIGH);
+  }
   relaySet(1, 0);
   Serial.println("[HORN] Hold mode stopped");
 }
@@ -108,19 +178,25 @@ void hornUpdate() {
       if (endPatternStep >= endPatternLength) {
         // Pattern complete
         Serial.println("[HORN] End pattern complete");
-        digitalWrite(HORN, HIGH);
+        if (HORN >= 0) {
+          digitalWrite(HORN, HIGH);
+        }
         relaySet(1, 0);
         endPatternStep = -1;
       } else {
         // Start next step
         endPatternStartTime = millis();
         if (endPattern[endPatternStep].on) {
-          digitalWrite(HORN, LOW);
+          if (HORN >= 0) {
+            digitalWrite(HORN, LOW);
+          }
           relaySet(1, 1);
           Serial.printf("[HORN] End pattern step %d: ON (%dms)\n", 
                        endPatternStep, endPattern[endPatternStep].duration);
         } else {
-          digitalWrite(HORN, HIGH);
+          if (HORN >= 0) {
+            digitalWrite(HORN, HIGH);
+          }
           relaySet(1, 0);
           Serial.printf("[HORN] End pattern step %d: OFF (%dms)\n", 
                        endPatternStep, endPattern[endPatternStep].duration);
@@ -138,7 +214,9 @@ void hornUpdate() {
   // Handle normal horn
   if (hornActive && (millis() - hornStartTime >= hornDuration)) {
     Serial.printf("[HORN] Pin %d: Setting HIGH (inactive)\n", HORN);
-    digitalWrite(HORN, HIGH);
+    if (HORN >= 0) {
+      digitalWrite(HORN, HIGH);
+    }
     relaySet(1, 0); // Relay 1 OFF
     Serial.println("[HORN] Horn deactivated");
     Serial.println("[HORN] Relay 1 turned OFF");
@@ -152,7 +230,9 @@ void hornStartEndPattern() {
     Serial.println("\n========== END SIGNAL PATTERN ==========");
     endPatternStep = 0;
     endPatternStartTime = millis();
-    digitalWrite(HORN, LOW);
+    if (HORN >= 0) {
+      digitalWrite(HORN, LOW);
+    }
     relaySet(1, 1);
     Serial.println("[HORN] Starting end pattern: 1s ON, 1s OFF, 1s ON, 1s OFF, 2s ON");
   }
@@ -170,6 +250,264 @@ void startShortSequence() {
 void cancelRace() {
   raceController.cancel();
   relayReset();
+}
+
+bool tftContains(const TftButton& b, int x, int y) {
+  if (!b.visible) return false;
+  return x >= b.x && x < (b.x + b.w) && y >= b.y && y < (b.y + b.h);
+}
+
+void tftDrawButton(const TftButton& b, bool active) {
+  uint16_t bg = active ? ILI9341_GREEN : b.color;
+  tft.fillRect(b.x, b.y, b.w, b.h, bg);
+  tft.drawRect(b.x, b.y, b.w, b.h, ILI9341_WHITE);
+  tft.setTextColor(ILI9341_WHITE);
+  tft.setTextSize(2);
+  // Center label in button
+  int16_t tx = b.x + (b.w - (int)strlen(b.label) * 12) / 2;
+  int16_t ty = b.y + (b.h / 2) - 8;
+  tft.setCursor(tx, ty);
+  tft.print(b.label);
+}
+
+// Get next non-completed scheduled start as "HH:MM" or "--:--"
+void tftGetNextStart(char* buf, int bufSize) {
+  if (schedule.getCount() == 0) { strncpy(buf, "--:--", bufSize); return; }
+  DateTime now = rtc.now();
+  int nowMin = now.hour() * 60 + now.minute();
+  int bestMin = -1, bestH = -1, bestM = -1;
+  for (int i = 0; i < schedule.getCount(); i++) {
+    ScheduleTime t = schedule.getTime(i);
+    if (t.completed) continue;
+    int tMin = t.toMinutes();
+    if (tMin > nowMin && (bestMin < 0 || tMin < bestMin)) {
+      bestMin = tMin; bestH = t.hour; bestM = t.minute;
+    }
+  }
+  if (bestMin < 0) strncpy(buf, "--:--", bufSize);
+  else snprintf(buf, bufSize, "%02d:%02d", bestH, bestM);
+}
+
+// Update button visibility based on race state and redraw changed buttons
+void tftUpdateContextButtons(bool force, bool running, bool sequence) {
+  bool active = running || sequence;
+  bool wasActive = tftLastRunning || tftLastSequence;
+  if (!force && active == wasActive) return;
+
+  // Clear the two action button rows
+  tft.fillRect(0, BTN_ROW1_Y, 320, BTN_H + BTN_H + 4, ILI9341_BLACK);
+
+  if (active) {
+    // Active: STOP (full width row 1)
+    tftButtons[BTN_START].visible       = false;
+    tftButtons[BTN_START_SHORT].visible = false;
+    tftButtons[BTN_STOP].visible        = true;
+    tftButtons[BTN_END].visible         = running;  // EINDE only when race running
+    tftButtons[BTN_HORN].visible        = true;
+  } else {
+    // Idle: START 5M + START 3M in row 1
+    tftButtons[BTN_START].visible       = true;
+    tftButtons[BTN_START_SHORT].visible = true;
+    tftButtons[BTN_STOP].visible        = false;
+    tftButtons[BTN_END].visible         = false;
+    tftButtons[BTN_HORN].visible        = true;
+  }
+
+  // Draw visible action buttons (not relays)
+  for (int i = 0; i <= BTN_HORN; i++) {
+    if (tftButtons[i].visible) tftDrawButton(tftButtons[i], false);
+  }
+}
+
+void tftDrawStaticUi() {
+  tft.fillScreen(ILI9341_BLACK);
+  // Draw relay buttons (always visible)
+  for (int i = BTN_R1; i <= BTN_R4; i++) {
+    tftDrawButton(tftButtons[i], relayGet((i - BTN_R1) + 1) != 0);
+  }
+  // Bottom action bar border
+  tft.drawFastHLine(0, 190, 320, ILI9341_DARKCYAN);
+}
+
+void tftDrawDynamicUi(bool force) {
+  bool running  = raceController.isRunning();
+  bool sequence = raceController.isSequence();
+  int  remainingSec = (int)(raceController.getRemaining() / 1000UL);
+
+  // --- Context buttons (only redraw when state changes) ---
+  tftUpdateContextButtons(force, running, sequence);
+
+  // --- Time row (top left HH:MM:SS) ---
+  {
+    DateTime now = rtc.now();
+    char timeStr[9];
+    snprintf(timeStr, sizeof(timeStr), "%02d:%02d:%02d", now.hour(), now.minute(), now.second());
+    if (force || strcmp(timeStr, tftLastTimeStr) != 0) {
+      strncpy(tftLastTimeStr, timeStr, sizeof(tftLastTimeStr));
+      tft.fillRect(0, 2, 130, 18, ILI9341_BLACK);
+      tft.setTextSize(2);
+      tft.setTextColor(ILI9341_CYAN);
+      tft.setCursor(2, 4);
+      tft.print(timeStr);
+    }
+    // Next start (top right)
+    char nextStr[6];
+    tftGetNextStart(nextStr, sizeof(nextStr));
+    if (force || strcmp(nextStr, tftLastNextStart) != 0) {
+      strncpy(tftLastNextStart, nextStr, sizeof(tftLastNextStart));
+      tft.fillRect(135, 2, 185, 18, ILI9341_BLACK);
+      tft.setTextSize(2);
+      tft.setTextColor(ILI9341_YELLOW);
+      tft.setCursor(137, 4);
+      tft.printf("Vgl:%s", nextStr);
+    }
+  }
+
+  // --- Status bar (race timer) ---
+  if (force || running != tftLastRunning || sequence != tftLastSequence || remainingSec != tftLastRemainingSec) {
+    tft.fillRect(0, 24, 320, 20, ILI9341_BLACK);
+    tft.setTextSize(2);
+    if (sequence) {
+      tft.setTextColor(ILI9341_YELLOW);
+      tft.setCursor(2, 26);
+      int m = remainingSec / 60, s = remainingSec % 60;
+      tft.printf("AFTELLEN  %d:%02d", m, s);
+    } else if (running) {
+      tft.setTextColor(ILI9341_GREEN);
+      tft.setCursor(2, 26);
+      unsigned long ov = raceController.getElapsed() > 300000UL ? raceController.getElapsed() - 300000UL : 0;
+      int sec = (int)(ov / 1000UL);
+      tft.printf("RACE  +%d:%02d", sec / 60, sec % 60);
+    } else {
+      tft.setTextColor(ILI9341_DARKGREY);
+      tft.setCursor(2, 26);
+      tft.print("KLAAR");
+    }
+    tftLastRunning    = running;
+    tftLastSequence   = sequence;
+    tftLastRemainingSec = remainingSec;
+  }
+
+  // --- Relay buttons ---
+  for (int i = 0; i < 4; i++) {
+    int state = relayGet(i + 1);
+    if (force || state != tftLastRelayState[i]) {
+      tftLastRelayState[i] = state;
+      tftDrawButton(tftButtons[BTN_R1 + i], state != 0);
+    }
+  }
+
+  // --- Last action text ---
+  {
+    static String lastDrawnAction = "";
+    if (force || tftLastAction != lastDrawnAction) {
+      lastDrawnAction = tftLastAction;
+      tft.fillRect(0, 193, 320, 20, ILI9341_BLACK);
+      tft.setTextSize(2);
+      tft.setTextColor(ILI9341_WHITE);
+      tft.setCursor(4, 195);
+      tft.print(tftLastAction);
+    }
+  }
+}
+
+bool tftReadTouch(int& sx, int& sy) {
+  if (!touch.touched()) {
+    return false;
+  }
+
+  TS_Point p = touch.getPoint();
+  if (p.z < 100 || p.z > 3500) {
+    return false;
+  }
+
+  Serial.printf("[TOUCH] raw x=%d y=%d z=%d\n", p.x, p.y, p.z);
+
+  // For landscape rotation=1: hardware p.y maps to screen X, p.x maps to screen Y
+  const int rawMin = 200;
+  const int rawMax = 3900;
+  sx = map(constrain(p.y, rawMin, rawMax), rawMin, rawMax, 0, 320);
+  sy = map(constrain(p.x, rawMin, rawMax), rawMin, rawMax, 0, 240);
+
+  Serial.printf("[TOUCH] mapped sx=%d sy=%d\n", sx, sy);
+  return true;
+}
+
+void tftHandleButtonPress(TftButtonId id) {
+  switch (id) {
+    case BTN_START:
+      startSequence();
+      tftLastAction = "Start 5 min";
+      break;
+    case BTN_START_SHORT:
+      startShortSequence();
+      tftLastAction = "Start 3 min";
+      break;
+    case BTN_STOP:
+      cancelRace();
+      tftLastAction = "Gestopt";
+      break;
+    case BTN_END:
+      hornStartEndPattern();
+      tftLastAction = "Einde signaal";
+      break;
+    case BTN_HORN:
+      hornStart(2000);
+      tftLastAction = "Toeter 2 sec";
+      break;
+    case BTN_R1:
+    case BTN_R2:
+    case BTN_R3:
+    case BTN_R4: {
+      int relayNr = (id - BTN_R1) + 1;
+      int newState = relayGet(relayNr) ? 0 : 1;
+      relaySet(relayNr, newState);
+      tftLastAction = "Relay " + String(relayNr) + (newState ? " AAN" : " UIT");
+      break;
+    }
+    default:
+      break;
+  }
+}
+
+void tftHandleTouch() {
+  int tx = 0;
+  int ty = 0;
+  bool touched = tftReadTouch(tx, ty);
+
+  if (touched && !tftTouchDown) {
+    tftTouchDown = true;
+    bool hitButton = false;
+    for (int i = 0; i < BTN_COUNT; i++) {
+      if (tftContains(tftButtons[i], tx, ty)) {
+        tftHandleButtonPress((TftButtonId)i);
+        hitButton = true;
+        // Force full redraw after button press (state may have changed)
+        tftDrawDynamicUi(true);
+        break;
+      }
+    }
+    if (!hitButton) {
+      Serial.printf("[TOUCH] Geen knop op sx=%d sy=%d\n", tx, ty);
+    }
+  } else if (!touched) {
+    tftTouchDown = false;
+  }
+}
+
+void tftInit() {
+  pinMode(TFT_BLK, OUTPUT);
+  digitalWrite(TFT_BLK, HIGH);
+
+  SPI.begin(TFT_SCK, TFT_MISO, TFT_MOSI, TFT_CS);
+  tft.begin(4000000);
+  tft.setRotation(1);
+
+  touch.begin();
+  touch.setRotation(1);
+
+  tftDrawStaticUi();
+  tftDrawDynamicUi(true);
 }
 
 // ================= ROOT =================
@@ -291,8 +629,10 @@ void setup() {
   delay(100);
   Serial.println("\n\n=== ESP32 Race Controller Starting ===");
 
-  pinMode(HORN, OUTPUT);
-  digitalWrite(HORN, HIGH);
+  if (HORN >= 0) {
+    pinMode(HORN, OUTPUT);
+    digitalWrite(HORN, HIGH);
+  }
 
   Serial.println("Initializing LittleFS...");
   LittleFS.begin(true);
@@ -305,7 +645,7 @@ void setup() {
 
   Serial.println("Initializing hardware...");
   relayInit();
-  
+
   // Initialize I2C for RTC (ESP32: SDA=GPIO21, SCL=GPIO22)
   Serial.println("Initializing I2C bus...");
   Wire.begin(21, 22);
@@ -329,6 +669,9 @@ void setup() {
                   now.year(), now.month(), now.day(),
                   now.hour(), now.minute(), now.second());
   }
+
+  Serial.println("Initializing TFT UI...");
+  tftInit();
   
   Serial.println("Initializing race controller...");
   raceController.begin();
@@ -594,6 +937,7 @@ void setup() {
 void loop() {
 
   hornUpdate();  // Non-blocking horn timing
+  tftHandleTouch();
   webUI.update();
   server.handleClient();
   if (captivePortalActive) {
@@ -699,6 +1043,10 @@ void loop() {
 
   // Throttled WebSocket broadcast
   unsigned long now = millis();
+  if (now - tftLastRefresh >= 200) {
+    tftLastRefresh = now;
+    tftDrawDynamicUi(false);
+  }
   if (now - lastBroadcast >= BROADCAST_INTERVAL) {
     lastBroadcast = now;
     webUI.broadcastState(

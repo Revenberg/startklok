@@ -7,6 +7,8 @@ const int RELAY_2 = 33;
 const int RELAY_3 = 25;
 const int RELAY_4 = 26;
 
+static int relayState[5] = {0, 0, 0, 0, 0};
+
 void relayInit() {
 
   pinMode(RELAY_1, OUTPUT);
@@ -23,6 +25,10 @@ void relayReset() {
   digitalWrite(RELAY_2, LOW);
   digitalWrite(RELAY_3, LOW);
   digitalWrite(RELAY_4, LOW);
+  relayState[1] = 0;
+  relayState[2] = 0;
+  relayState[3] = 0;
+  relayState[4] = 0;
 }
 
 void relaySet(int nr, int state) {
@@ -38,4 +44,12 @@ void relaySet(int nr, int state) {
   }
 
   digitalWrite(pin, state ? HIGH : LOW);
+  relayState[nr] = state ? 1 : 0;
+}
+
+int relayGet(int nr) {
+  if (nr < 1 || nr > 4) {
+    return 0;
+  }
+  return relayState[nr];
 }
