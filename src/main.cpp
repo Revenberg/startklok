@@ -56,6 +56,10 @@ bool hornHoldActive = false;
 #define TOUCH_CS_PIN 13
 #define TOUCH_IRQ_PIN 14
 
+// Touch calibration flags for this panel orientation
+const bool TOUCH_MIRROR_X = false;
+const bool TOUCH_MIRROR_Y = false;
+
 Adafruit_ILI9341 tft(TFT_CS, TFT_DC, TFT_RST);
 XPT2046_Touchscreen touch(TOUCH_CS_PIN, TOUCH_IRQ_PIN);
 
@@ -97,6 +101,8 @@ TftButton tftButtons[BTN_COUNT] = {
 
 String tftLastAction = "Klaar";
 bool tftTouchDown = false;
+int tftTouchButtonCandidate = -1;
+unsigned long tftTouchPressStartMs = 0;
 unsigned long tftLastRefresh = 0;
 int tftLastRemainingSec = -1;
 bool tftLastSequence = false;
@@ -423,13 +429,30 @@ bool tftReadTouch(int& sx, int& sy) {
 
   Serial.printf("[TOUCH] raw x=%d y=%d z=%d\n", p.x, p.y, p.z);
 
-  // For landscape rotation=1: hardware p.y maps to screen X, p.x maps to screen Y
+  // touch.setRotation(1) already transforms coordinates.
+  // Apply optional mirroring to align touch with drawn UI.
   const int rawMin = 200;
   const int rawMax = 3900;
-  sx = map(constrain(p.y, rawMin, rawMax), rawMin, rawMax, 0, 320);
-  sy = map(constrain(p.x, rawMin, rawMax), rawMin, rawMax, 0, 240);
+
+  sx = map(constrain(p.x, rawMin, rawMax), rawMin, rawMax, 0, 319);
+  sy = map(constrain(p.y, rawMin, rawMax), rawMin, rawMax, 239, 0);
+
+  if (TOUCH_MIRROR_X) sx = 319 - sx;
+  if (TOUCH_MIRROR_Y) sy = 239 - sy;
 
   Serial.printf("[TOUCH] mapped sx=%d sy=%d\n", sx, sy);
+
+  // Show touch position on screen for calibration (bottom bar)
+  tft.fillRect(0, 215, 320, 25, ILI9341_BLACK);
+  tft.setTextSize(1);
+  tft.setTextColor(ILI9341_GREEN);
+  tft.setCursor(2, 220);
+  tft.printf("Touch: %d,%d  raw:%d,%d", sx, sy, p.x, p.y);
+  // Draw dot at mapped position (only in safe area)
+  if (sx >= 2 && sx < 318 && sy >= 2 && sy < 213) {
+    tft.fillCircle(sx, sy, 4, ILI9341_RED);
+  }
+
   return true;
 }
 
@@ -475,27 +498,39 @@ void tftHandleTouch() {
   int ty = 0;
   bool touched = tftReadTouch(tx, ty);
 
-  if (touched && !tftTouchDown) {
-    tftTouchDown = true;
-    bool hitButton = false;
-    for (int i = 0; i < BTN_COUNT; i++) {
-      if (tftContains(tftButtons[i], tx, ty)) {
-        tftHandleButtonPress((TftButtonId)i);
-        hitButton = true;
-        // Force full redraw after button press (state may have changed)
-        tftDrawDynamicUi(true);
-        break;
+  if (touched) {
+    if (!tftTouchDown) {
+      tftTouchDown = true;
+      tftTouchPressStartMs = millis();
+      tftTouchButtonCandidate = -1;
+      for (int i = 0; i < BTN_COUNT; i++) {
+        if (tftContains(tftButtons[i], tx, ty)) {
+          tftTouchButtonCandidate = i;
+          break;
+        }
+      }
+      if (tftTouchButtonCandidate < 0) {
+        Serial.printf("[TOUCH] Geen knop op sx=%d sy=%d\n", tx, ty);
       }
     }
-    if (!hitButton) {
-      Serial.printf("[TOUCH] Geen knop op sx=%d sy=%d\n", tx, ty);
+  } else if (tftTouchDown) {
+    unsigned long pressMs = millis() - tftTouchPressStartMs;
+    if (tftTouchButtonCandidate >= 0) {
+      if (pressMs >= 100 && pressMs <= 500) {
+        tftHandleButtonPress((TftButtonId)tftTouchButtonCandidate);
+        // Force full redraw after accepted button press (state may have changed)
+        tftDrawDynamicUi(true);
+      } else {
+        Serial.printf("[TOUCH] Knop genegeerd, duur=%lums (toegestaan: 100-500ms)\n", pressMs);
+      }
     }
-  } else if (!touched) {
+
     tftTouchDown = false;
+    tftTouchButtonCandidate = -1;
   }
 }
 
-void tftInit() {
+void tftHardwareInit() {
   pinMode(TFT_BLK, OUTPUT);
   digitalWrite(TFT_BLK, HIGH);
 
@@ -506,6 +541,15 @@ void tftInit() {
   touch.begin();
   touch.setRotation(1);
 
+  // Solid black screen so we know display works
+  tft.fillScreen(ILI9341_BLACK);
+  tft.setTextColor(ILI9341_CYAN);
+  tft.setTextSize(2);
+  tft.setCursor(10, 10);
+  tft.print("Opstarten...");
+}
+
+void tftDrawInitialUi() {
   tftDrawStaticUi();
   tftDrawDynamicUi(true);
 }
@@ -646,6 +690,10 @@ void setup() {
   Serial.println("Initializing hardware...");
   relayInit();
 
+  // TFT hardware FIRST - before Wire/I2C so SPI bus is undisturbed
+  Serial.println("Initializing TFT hardware...");
+  tftHardwareInit();
+
   // Initialize I2C for RTC (ESP32: SDA=GPIO21, SCL=GPIO22)
   Serial.println("Initializing I2C bus...");
   Wire.begin(21, 22);
@@ -670,14 +718,15 @@ void setup() {
                   now.hour(), now.minute(), now.second());
   }
 
-  Serial.println("Initializing TFT UI...");
-  tftInit();
-  
   Serial.println("Initializing race controller...");
   raceController.begin();
   
   Serial.println("Loading schedule...");
   schedule.begin();
+
+  // Draw full UI now that RTC and schedule are ready
+  Serial.println("Drawing TFT UI...");
+  tftDrawInitialUi();
   
   Serial.println("Initializing Telegram...");
   telegram.begin();
