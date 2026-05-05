@@ -74,7 +74,7 @@ enum TftButtonId {
   BTN_START,        // START 5M - idle only
   BTN_START_SHORT,  // START 3M - idle only
   BTN_STOP,         // STOP     - sequence/running only (full width row 1)
-  BTN_END,          // EINDE    - running only
+  BTN_END,          // EINDE    - idle only, next to TOETER
   BTN_HORN,         // TOETER   - always
   BTN_R1, BTN_R2, BTN_R3, BTN_R4,
   BTN_COUNT
@@ -110,6 +110,7 @@ bool tftLastRunning = false;
 int tftLastRelayState[4] = {-1, -1, -1, -1};
 char tftLastTimeStr[9] = "";
 char tftLastNextStart[6] = "";
+int tftLastDeviceCount = -1;
 
 // Horn pattern sequence (for "end" signal)
 struct HornPattern {
@@ -308,14 +309,14 @@ void tftUpdateContextButtons(bool force, bool running, bool sequence) {
     tftButtons[BTN_START].visible       = false;
     tftButtons[BTN_START_SHORT].visible = false;
     tftButtons[BTN_STOP].visible        = true;
-    tftButtons[BTN_END].visible         = running;  // EINDE only when race running
+    tftButtons[BTN_END].visible         = false;
     tftButtons[BTN_HORN].visible        = true;
   } else {
     // Idle: START 5M + START 3M in row 1
     tftButtons[BTN_START].visible       = true;
     tftButtons[BTN_START_SHORT].visible = true;
     tftButtons[BTN_STOP].visible        = false;
-    tftButtons[BTN_END].visible         = false;
+    tftButtons[BTN_END].visible         = true;
     tftButtons[BTN_HORN].visible        = true;
   }
 
@@ -358,14 +359,16 @@ void tftDrawDynamicUi(bool force) {
     }
     // Next start (top right)
     char nextStr[6];
+    int deviceCount = WiFi.softAPgetStationNum();
     tftGetNextStart(nextStr, sizeof(nextStr));
-    if (force || strcmp(nextStr, tftLastNextStart) != 0) {
+    if (force || strcmp(nextStr, tftLastNextStart) != 0 || deviceCount != tftLastDeviceCount) {
       strncpy(tftLastNextStart, nextStr, sizeof(tftLastNextStart));
+      tftLastDeviceCount = deviceCount;
       tft.fillRect(135, 2, 185, 18, ILI9341_BLACK);
       tft.setTextSize(2);
       tft.setTextColor(ILI9341_YELLOW);
       tft.setCursor(137, 4);
-      tft.printf("Vgl:%s", nextStr);
+      tft.printf("Vgl:%s D:%d", nextStr, deviceCount);
     }
   }
 
@@ -427,8 +430,6 @@ bool tftReadTouch(int& sx, int& sy) {
     return false;
   }
 
-  Serial.printf("[TOUCH] raw x=%d y=%d z=%d\n", p.x, p.y, p.z);
-
   // touch.setRotation(1) already transforms coordinates.
   // Apply optional mirroring to align touch with drawn UI.
   const int rawMin = 200;
@@ -439,19 +440,6 @@ bool tftReadTouch(int& sx, int& sy) {
 
   if (TOUCH_MIRROR_X) sx = 319 - sx;
   if (TOUCH_MIRROR_Y) sy = 239 - sy;
-
-  Serial.printf("[TOUCH] mapped sx=%d sy=%d\n", sx, sy);
-
-  // Show touch position on screen for calibration (bottom bar)
-  tft.fillRect(0, 215, 320, 25, ILI9341_BLACK);
-  tft.setTextSize(1);
-  tft.setTextColor(ILI9341_GREEN);
-  tft.setCursor(2, 220);
-  tft.printf("Touch: %d,%d  raw:%d,%d", sx, sy, p.x, p.y);
-  // Draw dot at mapped position (only in safe area)
-  if (sx >= 2 && sx < 318 && sy >= 2 && sy < 213) {
-    tft.fillCircle(sx, sy, 4, ILI9341_RED);
-  }
 
   return true;
 }
@@ -516,12 +504,12 @@ void tftHandleTouch() {
   } else if (tftTouchDown) {
     unsigned long pressMs = millis() - tftTouchPressStartMs;
     if (tftTouchButtonCandidate >= 0) {
-      if (pressMs >= 100 && pressMs <= 500) {
+      if (pressMs >= 50 && pressMs <= 1000) {
         tftHandleButtonPress((TftButtonId)tftTouchButtonCandidate);
         // Force full redraw after accepted button press (state may have changed)
         tftDrawDynamicUi(true);
       } else {
-        Serial.printf("[TOUCH] Knop genegeerd, duur=%lums (toegestaan: 100-500ms)\n", pressMs);
+        Serial.printf("[TOUCH] Knop genegeerd, duur=%lums (toegestaan: 50-1000ms)\n", pressMs);
       }
     }
 
@@ -733,10 +721,11 @@ void setup() {
   
   // Configure NTP for time synchronization and sync to RTC
   Serial.println("Configuring NTP...");
-  configTime(3600, 3600, "pool.ntp.org", "time.nist.gov");
+  configTzTime("CET-1CEST,M3.5.0/2,M10.5.0/3", "pool.ntp.org", "time.nist.gov");
   
   // Wait for NTP sync and update RTC
-  if (cfg.mode == "STA" && WiFi.status() == WL_CONNECTED) {
+  bool wifiConnected = WiFi.status() == WL_CONNECTED;
+  if (wifiConnected) {
     Serial.println("[NTP] Waiting for time sync...");
     struct tm timeinfo;
     if (getLocalTime(&timeinfo, 10000)) {
@@ -753,13 +742,15 @@ void setup() {
     }
   }
   
-  // Print IP address
-  if (cfg.mode == "STA" && WiFi.status() == WL_CONNECTED) {
+  // Print actual network status instead of configured mode.
+  if (wifiConnected) {
     Serial.print("WiFi connected! IP: ");
     Serial.println(WiFi.localIP());
-  } else {
+  } else if (WiFi.getMode() == WIFI_AP || WiFi.getMode() == WIFI_AP_STA) {
     Serial.print("AP Mode started. IP: ");
     Serial.println(WiFi.softAPIP());
+  } else {
+    Serial.println("[WiFi] Not connected and AP not active");
   }
   
   Serial.println("Starting WebSocket server...");
